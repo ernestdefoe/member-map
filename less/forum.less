@@ -384,27 +384,30 @@
       border: 3px solid var(--body-bg);
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
       box-sizing: border-box;
+      // Enough of each face shows for its initial to read.
       & + .Avatar {
-        margin-left: -18px;
+        margin-left: -12px;
       }
     }
   }
+  // Above the stack's top-right corner, clear of the front face.
   &-count {
     position: absolute;
-    top: -8px;
-    right: -10px;
-    min-width: 22px;
-    height: 22px;
-    padding: 0 6px;
-    border-radius: 11px;
+    bottom: calc(100% - 8px);
+    left: calc(100% - 14px);
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
     background: var(--primary-color);
     color: var(--button-primary-color, #fff);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: bold;
-    line-height: 22px;
+    line-height: 20px;
     text-align: center;
     border: 2px solid var(--body-bg);
     box-sizing: content-box;
+    white-space: nowrap;
   }
   &.is-online::after {
     content: '';
