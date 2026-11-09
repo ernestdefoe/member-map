@@ -860,7 +860,7 @@ export default class MapPage extends Page {
       type: 'geojson',
       data: this.geojson(),
       cluster: true,
-      clusterRadius: 56,
+      clusterRadius: 40,
       clusterMaxZoom: 13,
       clusterProperties: { online: ['+', ['get', 'online']] },
     });
