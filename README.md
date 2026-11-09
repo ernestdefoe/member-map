@@ -4,6 +4,8 @@ An opt-in map of where your community's members are, for Flarum 2.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) [![Latest Stable Version](https://img.shields.io/packagist/v/ernestdefoe/member-map.svg)](https://packagist.org/packages/ernestdefoe/member-map)
 
+![Member Map](screenshots/globe.png)
+
 - **A living globe.** The map opens as a 3D globe and eases down to where your members are. Smooth vector maps (free OpenFreeMap tiles, no key), avatars as pins that stack into clusters, a soft pulse on everyone online right now, and a drop-in for newcomers. Follows dark mode.
 - **Member cards** with their place, their local time ("3:42 PM there") and any trips, as popups on desktop and a bottom sheet on phones.
 - **Travel pins.** "I'm visiting Chicago Dec 3–7": members who live nearby get a notification so you can meet up. The pin goes away by itself.
