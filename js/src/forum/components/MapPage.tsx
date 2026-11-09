@@ -289,9 +289,7 @@ export default class MapPage extends Page {
 
     return (
       <div className="MemberMapPage-actions">
-        {place && (
-          <span className="MemberMapPage-you">{place.listed === false ? t('page.not_listed') : t('page.you_are', { label: place.label })}</span>
-        )}
+        {place && <p className="MemberMapPage-you">{place.listed === false ? t('page.not_listed') : t('page.you_are', { label: place.label })}</p>}
         {canList && (
           <Button
             className={'Button' + (place ? '' : ' Button--primary')}
