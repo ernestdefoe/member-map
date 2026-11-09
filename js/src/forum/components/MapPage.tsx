@@ -149,7 +149,11 @@ export default class MapPage extends Page {
   private syncQueued = false;
   private introDone = false;
   private onPhoneChange = () => m.redraw();
+  /** Whether the last input was the keyboard: cards take focus only then, so a click leaves no focus ring. */
+  private keyboard = false;
+  private onPointer = () => (this.keyboard = false);
   private onKey = (e: KeyboardEvent) => {
+    this.keyboard = true;
     if (e.key === 'Escape' && this.selected) {
       this.close();
       m.redraw();
@@ -162,6 +166,7 @@ export default class MapPage extends Page {
     this.bodyClass = 'App--memberMap';
     this.phone.addEventListener('change', this.onPhoneChange);
     document.addEventListener('keydown', this.onKey);
+    document.addEventListener('pointerdown', this.onPointer);
     if (app.forum.attribute('memberMapCanView')) this.load();
   }
 
@@ -175,6 +180,7 @@ export default class MapPage extends Page {
     super.onremove(vnode);
     this.phone.removeEventListener('change', this.onPhoneChange);
     document.removeEventListener('keydown', this.onKey);
+    document.removeEventListener('pointerdown', this.onPointer);
     this.handle?.destroy();
     this.handle = this.map = null;
   }
@@ -784,7 +790,7 @@ export default class MapPage extends Page {
     const element = document.createElement('div');
     m.render(element, this.card(selected));
     this.popup?.remove();
-    const popup = new engine.default.Popup({ offset: 26, maxWidth: '300px', className: 'MemberMapPopup', focusAfterOpen: true })
+    const popup = new engine.default.Popup({ offset: 26, maxWidth: '300px', className: 'MemberMapPopup', focusAfterOpen: this.keyboard })
       .setLngLat(lngLat)
       .setDOMContent(element)
       .addTo(this.map);
@@ -809,7 +815,8 @@ export default class MapPage extends Page {
   // ---------------------------------------------------------------- map
 
   createMap(element: HTMLElement) {
-    loadEngine().then((module) => {
+    loadEngine().then(async (module) => {
+      await module.prepare();
       if (!module.supported()) {
         this.supported = false;
         this.mode = 'list';

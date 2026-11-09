@@ -65,7 +65,7 @@ class TripController implements RequestHandlerInterface
         if (Trip::current()->where('user_id', $actor->id)->count() >= self::MAX_CURRENT) {
             return Errors::make(422, 'member_map_too_many_trips');
         }
-        if ($this->limit->exceeded($actor)) {
+        if ($this->limit->exceeded($actor) || $this->limit->dailyExceeded($actor, 'trips', 5)) {
             return Errors::make(429, 'member_map_slow_down');
         }
 

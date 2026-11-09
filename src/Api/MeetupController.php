@@ -83,14 +83,19 @@ class MeetupController implements RequestHandlerInterface
         $tags = null;
         if ($this->extensions->isEnabled('flarum-tags')) {
             $tag = (int) $this->settings->get(Settings::MEETUP_TAG);
-            if ($tag) {
+            $model = $tag && class_exists(\Flarum\Tags\Tag::class) ? \Flarum\Tags\Tag::whereVisibleTo($actor)->find($tag) : null;
+            if ($model) {
+                // process() skips the tag's own permission check: a restricted tag stays restricted.
+                if (! $actor->can('startDiscussion', $model)) {
+                    return Errors::make(403, 'member_map_meetup_tag_denied');
+                }
                 $tags = [$tag];
             } elseif (! $actor->hasPermission('bypassTagCounts')) {
                 return Errors::make(422, 'member_map_meetup_needs_tag');
             }
         }
 
-        if ($this->limit->exceeded($actor)) {
+        if ($this->limit->exceeded($actor) || $this->limit->dailyExceeded($actor, 'meetups', 3)) {
             return Errors::make(429, 'member_map_slow_down');
         }
 

@@ -21,7 +21,8 @@ export default class PinMap extends Component<{
 
   oninit(vnode: Mithril.Vnode<any, this>) {
     super.oninit(vnode);
-    import('../map/engine').then((module) => {
+    import('../map/engine').then(async (module) => {
+      await module.prepare();
       this.engine = module;
       m.redraw();
     });

@@ -151,6 +151,7 @@ ernestdefoe-member-map:
       member_map_bad_trip: "Check the dates: a trip can't end before it starts, be in the past, or last more than 60 days."
       member_map_too_many_trips: You already have 5 upcoming trips. Remove one first.
       member_map_bad_meetup: "Check the meetup: it needs a name (3 to 80 characters) and a time in the coming year."
+      member_map_meetup_tag_denied: "You can't start discussions in the tag meetups go in, so you can't plan one here."
       member_map_meetup_needs_tag: "Meetups can't be planned yet: an admin needs to choose a tag for them in the Member Map settings."
     notification:
       trip: "{username} is visiting near you"

@@ -25,6 +25,15 @@ class RateLimit
             || $this->hit('d:'.$actor->id.':'.intdiv(time(), 86400), 90000) > self::PER_DAY;
     }
 
+    /**
+     * Trips and meetups a member may start in a day: each one alerts
+     * neighbors or starts a discussion, which core's flood control never sees.
+     */
+    public function dailyExceeded(User $actor, string $kind, int $max): bool
+    {
+        return $this->hit($kind.':'.$actor->id.':'.intdiv(time(), 86400), 90000) > $max;
+    }
+
     private function hit(string $key, int $ttl): int
     {
         $key = 'member-map:rate:'.$key;

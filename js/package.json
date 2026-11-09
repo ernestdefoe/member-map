@@ -3,8 +3,8 @@
   "name": "@ernestdefoe/member-map",
   "version": "0.1.0",
   "scripts": {
-    "dev": "webpack --mode development --watch",
-    "build": "webpack --mode production",
+    "dev": "node scripts/copy-worker.mjs && webpack --mode development --watch",
+    "build": "webpack --mode production && node scripts/copy-worker.mjs",
     "format": "prettier --write src",
     "format-check": "prettier --check src"
   },
@@ -17,6 +17,6 @@
   },
   "prettier": "@flarum/prettier-config",
   "dependencies": {
-    "maplibre-gl": "5.24.0"
+    "maplibre-gl": "6.17.0"
   }
 }
