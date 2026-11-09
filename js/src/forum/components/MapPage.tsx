@@ -330,6 +330,7 @@ export default class MapPage extends Page {
 
   saved() {
     this.justAdded = Number(app.session.user!.id());
+    this.introDone = this.data.members.length > 0;
     this.load();
   }
 
@@ -1052,10 +1053,12 @@ export default class MapPage extends Page {
   intro() {
     const map = this.map;
     if (!map || !this.ready || this.loading || this.introDone) return;
-    this.introDone = true;
     this.drawLayers();
 
+    // An empty map keeps its intro for the first member to add themselves.
     const rows = this.data.members;
+    if (!rows.length) return;
+    this.introDone = true;
     // A deep link (deepLink below) flies straight to its target instead.
     const params = new URLSearchParams(window.location.search);
     if (!rows.length || ['meetup', 'traveler', 'member'].some((key) => params.has(key))) return;
