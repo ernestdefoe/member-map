@@ -147,6 +147,8 @@ export default class MapPage extends Page {
   markers = new Map<string, any>();
   layerMarkers: any[] = [];
   private syncQueued = false;
+  /** Set on the map's first `load`. Not map.loaded(): that stays false while any tile is still loading. */
+  private ready = false;
   private introDone = false;
   private onPhoneChange = () => m.redraw();
   /** Whether the last input was the keyboard: cards take focus only then, so a click leaves no focus ring. */
@@ -782,7 +784,18 @@ export default class MapPage extends Page {
     if (this.phone.matches || !this.map) {
       this.popup?.remove();
       this.popup = null;
-      this.map?.easeTo({ center: lngLat, duration: engine?.reducedMotion() ? 0 : 400, padding: { top: 0, bottom: 260, left: 0, right: 0 } });
+      if (this.map) {
+        // The map's top just under the header, and what was tapped above the sheet (about half the screen).
+        const box = this.map.getContainer() as HTMLElement;
+        const header = (document.querySelector('#header') as HTMLElement | null)?.offsetHeight || 0;
+        const top = box.getBoundingClientRect().top - header;
+        if (Math.abs(top) > 2) window.scrollBy({ top, behavior: engine?.reducedMotion() ? 'auto' : 'smooth' });
+        this.map.easeTo({
+          center: lngLat,
+          duration: engine?.reducedMotion() ? 0 : 400,
+          padding: { top: 0, bottom: Math.round(box.clientHeight * 0.45), left: 0, right: 0 },
+        });
+      }
       m.redraw();
       return;
     }
@@ -835,6 +848,7 @@ export default class MapPage extends Page {
         }
       });
       this.map.once('load', () => {
+        this.ready = true;
         this.intro();
         this.deepLink();
       });
@@ -1037,12 +1051,14 @@ export default class MapPage extends Page {
   /** Opens as a globe, then eases down into where the community is. */
   intro() {
     const map = this.map;
-    if (!map || !map.loaded() || this.loading || this.introDone) return;
+    if (!map || !this.ready || this.loading || this.introDone) return;
     this.introDone = true;
     this.drawLayers();
 
     const rows = this.data.members;
-    if (!rows.length || new URLSearchParams(window.location.search).toString()) return;
+    // A deep link (deepLink below) flies straight to its target instead.
+    const params = new URLSearchParams(window.location.search);
+    if (!rows.length || ['meetup', 'traveler', 'member'].some((key) => params.has(key))) return;
     // Where the members are on average, as directions from the earth's centre:
     // a bounding box's middle lands in the ocean for a community on two continents.
     let x = 0;
@@ -1061,13 +1077,18 @@ export default class MapPage extends Page {
     // Close together: ease down to fit them. Spread round the world: stay a globe, turned to face them.
     const bounds = new engine.default.LngLatBounds();
     rows.forEach((row) => bounds.extend([row[2], row[1]]));
+    // A globe a little narrower than the box. Its diameter is 512 * 2^zoom / (π cos lat) pixels:
+    // MapLibre's globe zoom is the Mercator zoom at the centre's latitude.
+    const box = map.getContainer();
+    const width = Math.max(200, Math.min(box.clientWidth, box.clientHeight));
+    const globeZoom = Math.log2((width * Math.PI * Math.cos((center[1] * Math.PI) / 180)) / 512);
     const land = (animate: boolean) =>
       spread > 0.9
         ? map.fitBounds(bounds, { padding: 60, maxZoom: 5, ...(animate ? { duration: 2800, essential: true } : { animate: false }) })
-        : map.easeTo({ center, zoom: 1.6, duration: animate ? 2800 : 0, essential: true });
+        : map.easeTo({ center, zoom: globeZoom, duration: animate ? 2800 : 0, essential: true });
 
     if (engine.reducedMotion()) {
-      map.jumpTo({ center, zoom: 1.6 });
+      map.jumpTo({ center, zoom: globeZoom });
       land(false);
       return;
     }
@@ -1085,7 +1106,7 @@ export default class MapPage extends Page {
 
   /** ?meetup=<discussion id>, ?traveler=<user id>, ?member=<user id>: from a notification, a post or a profile. */
   deepLink() {
-    if (!this.map || !this.map.loaded() || this.loading) return;
+    if (!this.map || !this.ready || this.loading) return;
     const params = new URLSearchParams(window.location.search);
     const meetup = this.data.meetups.find((row) => String(row[7]) === params.get('meetup'));
     const trip = this.data.trips.find((row) => String(row[0]) === params.get('traveler'));

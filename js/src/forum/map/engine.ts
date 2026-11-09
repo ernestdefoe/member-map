@@ -119,6 +119,9 @@ export function createMap(container: HTMLElement, options: MapOptions = {}): Map
 
   container.classList.toggle('MemberMap--rasterDark', raster && dark);
 
+  // MapLibre opens its compact credit expanded; on a phone that covers the map's foot, links and all.
+  map.once('load', () => container.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
+
   map.on('style.load', () => {
     if (options.globe !== false) map.setProjection({ type: 'globe' });
     localizeLabels(map);
