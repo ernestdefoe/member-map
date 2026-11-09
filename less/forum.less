@@ -79,6 +79,8 @@
   isolation: isolate;
   z-index: 0;
   height: 62vh;
+  // svh: the address bar showing and hiding must not resize the map.
+  height: 62svh;
   min-height: 320px;
   max-height: 620px;
   border-radius: var(--border-radius);
@@ -88,6 +90,7 @@
   @media @phone {
     // Leave page above and below to scroll by: a full-screen map traps the finger.
     height: 58vh;
+    height: 58svh;
     min-height: 280px;
   }
 
@@ -188,7 +191,8 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    max-height: 240px;
+    // Short enough to fit above a marker near the top of a phone's map, which can't pan further north.
+    max-height: ~"min(240px, 24vh)";
     overflow-y: auto;
   }
   .MemberMapPopup-member,

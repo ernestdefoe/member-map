@@ -269,11 +269,6 @@ export default class MapPage extends Page {
       // Never smaller than the box: zoomed further out, the world leaves grey bands above and below.
       // Whole zoom levels only: fractional ones leave hairline seams between tiles, stark in dark mode.
       minZoom: Math.max(1, Math.ceil(Math.log2(element.clientHeight / 256))),
-      maxBounds: [
-        [-85, -1e5],
-        [85, 1e5],
-      ],
-      maxBoundsViscosity: 1,
       // Places are city centres: closer than this shows nothing more.
       maxZoom: 12,
       worldCopyJump: true,
@@ -284,6 +279,7 @@ export default class MapPage extends Page {
     map.on('blur mouseout', () => map.scrollWheelZoom.disable());
 
     this.stopTiles = leaflet.addTiles(map);
+    map.on('resize', () => this.clampToWorld());
 
     this.cluster = L.markerClusterGroup({
       showCoverageOnHover: false,
@@ -330,7 +326,26 @@ export default class MapPage extends Page {
   showEveryone() {
     if (!this.map) return;
     if (!this.members.length) return void this.map.setView([20, 0], this.map.getMinZoom());
-    this.map.fitBounds(L.latLngBounds(this.members.map((member) => [member[1], member[2]] as [number, number])).pad(0.2), { maxZoom: 6 });
+    this.map.fitBounds(L.latLngBounds(this.members.map((member) => [member[1], member[2]] as [number, number])).pad(0.2), {
+      maxZoom: 6,
+      animate: false,
+    });
+    this.clampToWorld();
+  }
+
+  /**
+   * Keep the view off the grey beyond the poles, at first and when the box
+   * resizes. Not on every move: a popup near the top must still be able to
+   * pan into view.
+   */
+  clampToWorld() {
+    this.map?.panInsideBounds(
+      [
+        [-85, -1e5],
+        [85, 1e5],
+      ],
+      { animate: false }
+    );
   }
 
   /** The members at a marker or cluster: avatars, names and profile links, and a way to zoom in. */
