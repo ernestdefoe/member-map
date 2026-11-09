@@ -23,7 +23,11 @@ class MemberQuery
     {
     }
 
-    /** Members on the map: allowed to be listed, with a location (joined). */
+    /**
+     * Members on the map: allowed to be listed, with a location (joined).
+     *
+     * @return Builder<User>
+     */
     public function listable(User $actor): Builder
     {
         $table = (new Location())->getTable();

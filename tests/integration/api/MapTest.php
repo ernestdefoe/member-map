@@ -48,9 +48,9 @@ class MapTest extends TestCase
     }
 
     /** @return array{int, array<string, mixed>|null} */
-    private function get(string $path, ?int $as = 2): array
+    private function get(string $path, ?int $as = 2, array $query = []): array
     {
-        $response = $this->send($this->request('GET', $path, array_filter(['authenticatedAs' => $as])));
+        $response = $this->send($this->request('GET', $path, array_filter(['authenticatedAs' => $as]))->withQueryParams($query));
 
         return [$response->getStatusCode(), json_decode((string) $response->getBody(), true)];
     }
@@ -83,8 +83,10 @@ class MapTest extends TestCase
         $this->assertSame([3, 5], $ids);
 
         $row = array_values(array_filter($body['members'], fn ($m) => $m[0] === 3))[0];
-        $this->assertSame([3, 36.16, -86.77, 'located', 'located', null], $row);
-        $this->assertNull($body['me']);
+        $this->assertSame([3, 36.16, -86.77, 'located', 'located', null, null, null, 'Nashville, United States', 0], $row);
+        $this->assertSame(['place' => null, 'trips' => []], $body['me']);
+        $this->assertSame([], $body['trips']);
+        $this->assertSame([], $body['meetups']);
     }
 
     #[Test]
@@ -97,7 +99,7 @@ class MapTest extends TestCase
         $this->assertSame([1], array_column($body['members'], 0));
 
         [, $own] = $this->get('/api/member-map', 3);
-        $this->assertFalse($own['me']['listed']);
+        $this->assertFalse($own['me']['place']['listed']);
     }
 
     #[Test]
@@ -137,7 +139,63 @@ class MapTest extends TestCase
         $this->grant();
         [, $body] = $this->get('/api/users/5', 5);
 
-        $this->assertSame(['lat' => 52.5, 'lng' => 13.4, 'label' => 'Berlin, Germany', 'precision' => 'region', 'profile' => false, 'listed' => true], $body['data']['attributes']['memberMapOwn']);
+        $this->assertSame(['lat' => 52.5, 'lng' => 13.4, 'label' => 'Berlin, Germany', 'precision' => 'region', 'profile' => false, 'membersOnly' => false, 'listed' => true], $body['data']['attributes']['memberMapOwn']);
+    }
+
+    #[Test]
+    public function members_only_places_are_hidden_from_guests_but_not_members()
+    {
+        $this->grant([[Group::GUEST_ID, 'member-map.view'], [Group::MEMBER_ID, 'member-map.view'], [Group::MEMBER_ID, 'member-map.list']]);
+        $this->database()->table('member_map_locations')->where('user_id', 3)->update(['members_only' => true]);
+
+        [, $guest] = $this->get('/api/member-map', null);
+        $this->assertSame([5], array_column($guest['members'], 0));
+        $this->assertNull($guest['me']);
+
+        [, $member] = $this->get('/api/member-map');
+        $this->assertContains(3, array_column($member['members'], 0));
+
+        [, $profile] = $this->get('/api/users/3', null);
+        $this->assertNull($profile['data']['attributes']['memberMapLocation']);
+        $this->assertNull($profile['data']['attributes']['memberMapPoint']);
+    }
+
+    #[Test]
+    public function crawlers_are_never_served_the_map()
+    {
+        $this->grant([[Group::GUEST_ID, 'member-map.view'], [Group::MEMBER_ID, 'member-map.list']]);
+
+        $response = $this->send($this->request('GET', '/api/member-map')->withHeader('User-Agent', 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'));
+        $this->assertSame(403, $response->getStatusCode());
+
+        $ok = $this->send($this->request('GET', '/api/member-map')->withHeader('User-Agent', 'Mozilla/5.0 (Macintosh) Safari/605.1.15'));
+        $this->assertSame(200, $ok->getStatusCode());
+        $this->assertSame('noindex, nofollow', $ok->getHeaderLine('X-Robots-Tag'));
+    }
+
+    #[Test]
+    public function stats_count_members_by_country()
+    {
+        $this->grant();
+        $this->database()->table('member_map_locations')->where('user_id', 3)->update(['country_code' => 'us']);
+        $this->database()->table('member_map_locations')->where('user_id', 5)->update(['country_code' => 'de']);
+
+        [$status, $body] = $this->get('/api/member-map/stats');
+
+        $this->assertSame(200, $status);
+        $this->assertSame(2, $body['members']);
+        $this->assertEqualsCanonicalizing([['us', 1], ['de', 1]], $body['countries']);
+    }
+
+    #[Test]
+    public function the_group_filter_answers_only_with_ids()
+    {
+        $this->grant();
+        $this->database()->table('group_user')->insert(['user_id' => 5, 'group_id' => Group::MODERATOR_ID]);
+
+        [, $body] = $this->get('/api/member-map/filter', 2, ['group' => (string) Group::MODERATOR_ID]);
+
+        $this->assertSame(['ids' => [5]], $body);
     }
 
     #[Test]

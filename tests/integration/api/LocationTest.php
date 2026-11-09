@@ -57,12 +57,41 @@ class LocationTest extends TestCase
         [$status, $body] = $this->post(['lat' => 36.15123, 'lng' => -86.78456, 'precision' => 'city', 'profile' => true]);
 
         $this->assertSame(200, $status);
-        $this->assertSame('Nashville, United States', $body['me']['label']);
+        $this->assertSame('Nashville, United States', $body['place']['label']);
 
         $row = Location::find(2);
         $this->assertSame(36.16, $row->lat);
         $this->assertSame(-86.77, $row->lng);
         $this->assertSame('city', $row->precision);
+        $this->assertSame('us', $row->country_code);
+        // No browser zone sent: Tennessee's own zone, from its ISO code.
+        $this->assertSame('America/Chicago', $row->timezone);
+    }
+
+    #[Test]
+    public function the_browser_time_zone_is_used_only_when_it_belongs_to_the_country()
+    {
+        $this->fake();
+
+        $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city', 'timezone' => 'America/Indiana/Tell_City']);
+        $this->assertSame('America/Indiana/Tell_City', Location::find(2)->timezone);
+
+        $this->post(['lat' => 36.15, 'lng' => -86.79, 'precision' => 'city', 'timezone' => 'Europe/Paris']);
+        $this->assertSame('America/Chicago', Location::find(2)->timezone);
+    }
+
+    #[Test]
+    public function members_only_and_the_profile_switch_change_without_a_lookup()
+    {
+        $geocoder = $this->fake();
+        $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city']);
+
+        [$status, $body] = $this->post(['membersOnly' => true]);
+
+        $this->assertSame(200, $status);
+        $this->assertTrue($body['place']['membersOnly']);
+        $this->assertTrue(Location::find(2)->members_only);
+        $this->assertSame(1, $geocoder->calls);
     }
 
     #[Test]
@@ -135,7 +164,7 @@ class LocationTest extends TestCase
         [$status, $body] = $this->post(['profile' => false]);
 
         $this->assertSame(200, $status);
-        $this->assertFalse($body['me']['profile']);
+        $this->assertFalse($body['place']['profile']);
         $this->assertFalse(Location::find(2)->show_on_profile);
         $this->assertSame(1, $geocoder->calls);
     }

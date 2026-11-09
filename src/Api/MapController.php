@@ -104,7 +104,7 @@ class MapController implements RequestHandlerInterface
             'members' => $members,
             'trips' => $actor->isGuest() ? [] : $this->trips($actor, $slugs),
             'meetups' => $this->meetups($actor),
-            'me' => $actor->isGuest() ? null : ['place' => $me, 'trips' => Trip::current()->where('user_id', $actor->id)->orderBy('starts_on')->get()->map->toRow()->all()],
+            'me' => $actor->isGuest() ? null : ['place' => $me, 'trips' => Trip::current()->where('user_id', $actor->id)->orderBy('starts_on')->get()->map(fn (Trip $trip) => $trip->toRow())->all()],
         ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 

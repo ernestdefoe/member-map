@@ -31,10 +31,14 @@ class Trip extends AbstractModel
         'created_at' => 'datetime',
     ];
 
-    /** Trips that haven't ended yet. A day of slack: "today" differs round the world. */
+    /**
+     * Trips that haven't ended yet. A day of slack: "today" differs round the world.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<Trip>
+     */
     public static function current(): \Illuminate\Database\Eloquent\Builder
     {
-        return static::query()->where('ends_on', '>=', Carbon::today()->subDay()->toDateString());
+        return self::query()->where('ends_on', '>=', Carbon::today()->subDay()->toDateString());
     }
 
     /** @return array<string, mixed> */
