@@ -42,7 +42,7 @@ class GeocodeController implements RequestHandlerInterface
         $params = $request->getQueryParams();
 
         if (isset($params['q'])) {
-            $q = trim((string) $params['q']);
+            $q = is_string($params['q']) ? trim($params['q']) : '';
             if (mb_strlen($q) < 2 || mb_strlen($q) > 120) {
                 return Errors::make(422, 'member_map_bad_query');
             }
