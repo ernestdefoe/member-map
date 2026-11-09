@@ -1,4 +1,5 @@
 const config = require('flarum-webpack-config');
+const webpack = require('webpack');
 
 const NS = 'ernestdefoe-member-map';
 
@@ -28,7 +29,10 @@ module.exports = (...args) => {
   if (typeof base === 'function') base = base(...args);
 
   base.optimization = { ...base.optimization, chunkIds: false };
-  base.plugins = [...(base.plugins || []), new NamespacedChunkIds()];
+  // MapLibre computes a default worker URL from import.meta.url, which webpack would bake in as
+  // this machine's file:// path (a stale bundle in CI, and a local path in the shipped file). The
+  // engine always sets the worker URL itself (map/engine.ts prepare()), so the default is unused.
+  base.plugins = [...(base.plugins || []), new NamespacedChunkIds(), new webpack.DefinePlugin({ 'import.meta.url': '""' })];
 
   return base;
 };
