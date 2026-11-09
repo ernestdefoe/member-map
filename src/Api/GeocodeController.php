@@ -20,8 +20,9 @@ use Psr\Http\Server\RequestHandlerInterface;
  *   ?q=Nashville                          places matching the text
  *   ?lat=36.15&lng=-86.78&precision=city  what a saved location there would show as
  *
- * Only for members who may put themselves on the map: it spends the forum's
- * share of a third-party service.
+ * Only for signed-in members who may see or join the map (search the map,
+ * set a place, plan a trip or a meetup): it spends the forum's share of a
+ * third-party service, so it is rate limited per member.
  */
 class GeocodeController implements RequestHandlerInterface
 {
@@ -37,7 +38,9 @@ class GeocodeController implements RequestHandlerInterface
     {
         $actor = RequestUtil::getActor($request);
         $actor->assertRegistered();
-        $actor->assertCan(Settings::LIST);
+        if (! $actor->can(Settings::VIEW) && ! $actor->can(Settings::LIST)) {
+            return Errors::make(403, 'permission_denied');
+        }
 
         $params = $request->getQueryParams();
 

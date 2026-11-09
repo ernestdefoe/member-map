@@ -17,6 +17,8 @@ use ErnestDefoe\MemberMap\Api;
 use ErnestDefoe\MemberMap\Gdpr\MemberMapData;
 use ErnestDefoe\MemberMap\Http\MapPageContent;
 use ErnestDefoe\MemberMap\Location;
+use ErnestDefoe\MemberMap\Notification\TripNearbyBlueprint;
+use ErnestDefoe\MemberMap\Trip;
 use ErnestDefoe\MemberMap\Settings;
 use Flarum\Api\Context;
 use Flarum\Api\Resource\ForumResource;
@@ -26,7 +28,7 @@ use Flarum\Extend;
 use Flarum\Gdpr\Extend\UserData;
 use Flarum\User\Event\Deleted;
 
-return [
+$extenders = [
     (new Extend\Frontend('forum'))
         ->js(__DIR__.'/js/dist/forum.js')
         // 🚨 Not optional: the map page and the location form are chunks in here, and undeclared chunks 404.
@@ -42,8 +44,17 @@ return [
     (new Extend\Routes('api'))
         ->get('/member-map', 'member-map.index', Api\MapController::class)
         ->get('/member-map/geocode', 'member-map.geocode', Api\GeocodeController::class)
+        ->get('/member-map/filter', 'member-map.filter', Api\FilterController::class)
+        ->get('/member-map/stats', 'member-map.stats', Api\StatsController::class)
         ->post('/member-map/location', 'member-map.location.save', Api\SaveLocationController::class)
-        ->delete('/member-map/location', 'member-map.location.delete', Api\DeleteLocationController::class),
+        ->delete('/member-map/location', 'member-map.location.delete', Api\DeleteLocationController::class)
+        ->post('/member-map/trips', 'member-map.trips.create', Api\TripController::class)
+        ->delete('/member-map/trips/{id}', 'member-map.trips.delete', Api\TripController::class)
+        ->post('/member-map/meetups', 'member-map.meetups.create', Api\MeetupController::class)
+        ->delete('/member-map/meetups/{id}', 'member-map.meetups.delete', Api\MeetupController::class),
+
+    (new Extend\Notification())
+        ->type(TripNearbyBlueprint::class, ['alert']),
 
     (new Extend\ApiResource(UserResource::class))
         ->fields(Api\UserFields::class),
@@ -55,14 +66,22 @@ return [
                 ->get(fn ($forum, Context $context) => $context->getActor()->can(Settings::VIEW)),
             Schema\Boolean::make('memberMapCanList')
                 ->get(fn ($forum, Context $context) => $context->getActor()->can(Settings::LIST)),
+            Schema\Boolean::make('memberMapCanTravel')
+                ->get(fn ($forum, Context $context) => $context->getActor()->can(Settings::TRAVEL)),
+            Schema\Boolean::make('memberMapCanMeetup')
+                ->get(fn ($forum, Context $context) => $context->getActor()->can(Settings::MEETUP) && $context->getActor()->can('startDiscussion')),
         ]),
 
     (new Extend\Settings())
+        ->default(Settings::STYLE, Settings::DEFAULT_STYLE)
+        ->default(Settings::STYLE_DARK, Settings::DEFAULT_STYLE_DARK)
         ->default(Settings::TILES, Settings::DEFAULT_TILES)
         ->default(Settings::ATTRIBUTION, Settings::DEFAULT_ATTRIBUTION)
         ->default(Settings::GEOCODER, Settings::DEFAULT_GEOCODER)
         ->default(Settings::NAV, true)
         ->default(Settings::PROFILE, true)
+        ->serializeToForum('memberMapStyle', Settings::STYLE, fn ($value) => trim((string) $value) ?: null)
+        ->serializeToForum('memberMapStyleDark', Settings::STYLE_DARK, fn ($value) => trim((string) $value) ?: null)
         ->serializeToForum('memberMapTiles', Settings::TILES, fn ($value) => trim((string) $value) ?: Settings::DEFAULT_TILES)
         ->serializeToForum('memberMapTilesDark', Settings::TILES_DARK, fn ($value) => trim((string) $value) ?: null)
         ->serializeToForum('memberMapAttribution', Settings::ATTRIBUTION, fn ($value) => trim((string) $value) ?: Settings::DEFAULT_ATTRIBUTION)
@@ -71,10 +90,24 @@ return [
 
     // The foreign key does this too, where the database enforces it (SQLite may not).
     (new Extend\Event())
-        ->listen(Deleted::class, fn (Deleted $event) => Location::query()->where('user_id', $event->user->id)->delete()),
+        ->listen(Deleted::class, function (Deleted $event) {
+            Location::query()->where('user_id', $event->user->id)->delete();
+            Trip::query()->where('user_id', $event->user->id)->delete();
+        }),
 
     (new Extend\Conditional())
         ->whenExtensionEnabled('flarum-gdpr', fn () => [
             (new UserData())->addType(MemberMapData::class),
         ]),
 ];
+
+/*
+ * Page Builder's block contract has a server half. class_exists, not an
+ * extension-status lookup: this file is evaluated before the extension
+ * manager is usable, and naming a missing class is a fatal for everybody.
+ */
+if (class_exists(\Ernestdefoe\PageBuilder\Extend\PageBuilderBlock::class)) {
+    $extenders[] = new \Ernestdefoe\PageBuilder\Extend\PageBuilderBlock(\ErnestDefoe\MemberMap\Widget\WhereWeAreBlock::class);
+}
+
+return $extenders;

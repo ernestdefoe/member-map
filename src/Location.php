@@ -11,6 +11,10 @@ use Flarum\Database\AbstractModel;
  * @property string $precision
  * @property string $label
  * @property bool $show_on_profile
+ * @property string|null $country_code
+ * @property string|null $timezone
+ * @property bool $members_only
+ * @property \Carbon\Carbon|null $created_at
  * @property \Carbon\Carbon|null $updated_at
  */
 class Location extends AbstractModel
@@ -28,6 +32,8 @@ class Location extends AbstractModel
         'lat' => 'float',
         'lng' => 'float',
         'show_on_profile' => 'boolean',
+        'members_only' => 'boolean',
+        'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 }

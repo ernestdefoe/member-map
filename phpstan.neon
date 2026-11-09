@@ -11,3 +11,6 @@ parameters:
     paths:
         - extend.php
         - src
+    excludePaths:
+        # Implements Page Builder's interface; loaded only when Page Builder is installed.
+        - src/Widget/WhereWeAreBlock.php

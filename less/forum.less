@@ -1,9 +1,16 @@
-// Member Map. Leaflet's own CSS is injected by the map chunk (map/leaflet.ts),
+// Member Map. MapLibre's own CSS is injected by the engine chunk (map/engine.ts),
 // so forum pages that never open a map don't download it.
 // Every colour comes from Flarum's CSS properties: it follows light, dark and themes.
 
-.UserCard-memberMap .icon {
-  margin-right: 2px;
+@mm-online: #22c55e;
+
+.UserCard-memberMap,
+.UserCard-memberMap:hover {
+  color: inherit;
+  text-decoration: none;
+  .icon {
+    margin-right: 2px;
+  }
 }
 
 .Settings-memberMap-actions {
@@ -12,9 +19,11 @@
   gap: 8px;
 }
 
+// ------------------------------------------------------------------ page
+
 .MemberMapPage {
   &-head {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   &-title {
     margin: 0 0 4px;
@@ -29,11 +38,12 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
+    gap: 8px 10px;
   }
   &-you {
     color: var(--text-color);
     min-width: 0;
+    margin-right: 4px;
   }
   &-message {
     padding: 24px 0;
@@ -42,10 +52,22 @@
       margin-top: 8px;
     }
   }
-  &-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
+  &-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  &-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  &-stage {
+    position: relative;
   }
   &-mapWrap {
     position: relative;
@@ -54,7 +76,7 @@
   &-overlay {
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -70,116 +92,489 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
   }
+  &-below {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(~"min(280px, 100%)", 1fr));
+    gap: 24px;
+    margin-top: 20px;
+  }
 }
 
-// The map itself. `isolation` keeps Leaflet's panes (z-index up to 1000)
-// inside the map, under Flarum's header, dropdowns and composer.
+.MemberMapSection-heading {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--heading-color, var(--text-color));
+}
+
+.MemberMapSearch {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  flex: 1 1 220px;
+  max-width: 340px;
+  min-width: 0;
+  .FormControl {
+    flex: 1;
+    min-width: 0;
+  }
+  &-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    margin: 4px 0 0;
+    padding: 4px 0;
+    list-style: none;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--body-bg);
+    border-radius: var(--border-radius);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    li.helpText {
+      padding: 8px 12px;
+    }
+    button {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      border: 0;
+      background: none;
+      text-align: left;
+      font: inherit;
+      color: var(--text-color);
+      cursor: pointer;
+      &:hover,
+      &:focus-visible {
+        background: var(--control-bg);
+      }
+    }
+  }
+}
+
+.MemberMapChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--control-bg);
+  border-radius: 999px;
+  background: var(--body-bg);
+  color: var(--control-color, var(--text-color));
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  .icon {
+    font-size: 11px;
+  }
+  &.is-on {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--button-primary-color, #fff);
+  }
+  &-select.FormControl {
+    width: auto;
+    max-width: 180px;
+    height: auto;
+    padding: 6px 28px 6px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+}
+
+.MemberMapToggle {
+  display: inline-flex;
+  border-radius: 999px;
+  background: var(--control-bg);
+  padding: 2px;
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--control-color, var(--text-color));
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    &[aria-pressed='true'] {
+      background: var(--body-bg);
+      color: var(--text-color);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+  }
+}
+
+.MemberMapStats {
+  margin: 0 0 10px;
+  color: var(--muted-color);
+  font-size: 13px;
+  &-online {
+    color: var(--text-color);
+  }
+}
+
+.MemberMap-onlineDot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: @mm-online;
+  vertical-align: middle;
+}
+
+// ------------------------------------------------------------------ the map
+
+// `isolation` keeps MapLibre's layers and markers inside the map, under
+// Flarum's header, dropdowns and composer.
 .MemberMap {
   position: relative;
   isolation: isolate;
   z-index: 0;
   height: 62vh;
-  // svh: the address bar showing and hiding must not resize the map.
+  // svh: the phone address bar showing and hiding must not resize the map.
   height: 62svh;
-  min-height: 320px;
-  max-height: 620px;
+  min-height: 340px;
+  max-height: 680px;
   border-radius: var(--border-radius);
   overflow: hidden;
-  background: var(--control-bg);
+  background: #04070d;
   font: inherit;
-  @media @phone {
-    // Leave page above and below to scroll by: a full-screen map traps the finger.
-    height: 58vh;
-    height: 58svh;
-    min-height: 280px;
-  }
 
-  &.MemberMap--dark .leaflet-tile-pane {
+  // Picture tiles have no dark style: darken them, but not the markers.
+  &.MemberMap--rasterDark .maplibregl-canvas {
     filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85);
   }
 
-  .leaflet-bar {
-    border: 0;
+  .maplibregl-ctrl-group {
+    background: var(--body-bg);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-    a,
-    a:hover {
-      background: var(--body-bg);
-      color: var(--text-color);
-      border-bottom-color: var(--control-bg);
+    button + button {
+      border-top-color: var(--control-bg);
     }
-    a:hover {
-      background: var(--control-bg);
-    }
-    a.leaflet-disabled {
-      background: var(--body-bg);
-      color: var(--muted-color);
-      opacity: 0.6;
+    button .maplibregl-ctrl-icon {
+      filter: none;
     }
   }
-  .leaflet-control-attribution {
+  .maplibregl-ctrl-attrib {
     background: var(--body-bg);
     color: var(--muted-color);
-    opacity: 0.9;
     a {
       color: var(--link-color, var(--primary-color));
     }
   }
-  .leaflet-popup-content-wrapper,
-  .leaflet-popup-tip {
+}
+
+// MapLibre moves this wrapper (it owns its transform); everything below styles what's inside it.
+.MemberMapMarker {
+  line-height: 0;
+  // Behind the globe MapLibre sets opacity 0: nor should it catch a tap.
+  &[style*='opacity: 0'] {
+    pointer-events: none;
+  }
+  &:focus-within {
+    z-index: 3;
+  }
+}
+
+// Avatar pins. Buttons, so they take focus and a screen reader reads their label.
+.MemberMapPin {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  .Avatar {
+    --size: 40px;
+    display: block;
+    width: 40px;
+    height: 40px;
+    font-size: 17px;
+    line-height: 34px;
+    border: 3px solid var(--body-bg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    box-sizing: border-box;
+  }
+  &:hover,
+  &:focus-visible {
+    z-index: 2;
+    transform: scale(1.12);
+  }
+  &:focus-visible {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+  &.is-me .Avatar {
+    border-color: var(--primary-color);
+  }
+  // A soft pulse for members online right now.
+  &.is-online::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid @mm-online;
+    animation: MemberMap-pulse 2.4s ease-out infinite;
+    pointer-events: none;
+  }
+  // Newcomers drop onto the map.
+  &.is-new {
+    animation: MemberMap-drop 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  &--trip {
+    width: 30px;
+    height: 30px;
+    .Avatar {
+      --size: 30px;
+      width: 30px;
+      height: 30px;
+      font-size: 13px;
+      line-height: 26px;
+      border-width: 2px;
+    }
+  }
+  &-badge {
+    position: absolute;
+    right: -6px;
+    bottom: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #f59e0b;
+    color: #111;
+    font-size: 9px;
+    line-height: 18px;
+    text-align: center;
+    border: 2px solid var(--body-bg);
+  }
+}
+
+// A cluster: up to three faces fanned out, and how many.
+.MemberMapStack {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  &-faces {
+    display: flex;
+    min-width: 40px;
+    min-height: 40px;
+    .Avatar {
+      --size: 38px;
+      width: 38px;
+      height: 38px;
+      font-size: 15px;
+      line-height: 32px;
+      border: 3px solid var(--body-bg);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      box-sizing: border-box;
+      & + .Avatar {
+        margin-left: -18px;
+      }
+    }
+  }
+  &-count {
+    position: absolute;
+    top: -8px;
+    right: -10px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    background: var(--primary-color);
+    color: var(--button-primary-color, #fff);
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 22px;
+    text-align: center;
+    border: 2px solid var(--body-bg);
+    box-sizing: content-box;
+  }
+  &.is-online::after {
+    content: '';
+    position: absolute;
+    left: -2px;
+    bottom: -2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: @mm-online;
+    border: 2px solid var(--body-bg);
+    animation: MemberMap-glow 2.4s ease-out infinite;
+  }
+  &:hover,
+  &:focus-visible {
+    z-index: 2;
+    transform: scale(1.08);
+  }
+  &:focus-visible {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 4px;
+    border-radius: 24px;
+  }
+}
+
+.MemberMapMeetupPin {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 3px solid var(--body-bg);
+  border-radius: 50% 50% 50% 0;
+  rotate: -45deg;
+  background: #db2777;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  .fas {
+    rotate: 45deg;
+    font-size: 13px;
+  }
+  &:focus-visible {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes MemberMap-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes MemberMap-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 fade(@mm-online, 60%);
+  }
+  50% {
+    box-shadow: 0 0 0 5px fade(@mm-online, 0%);
+  }
+}
+
+@keyframes MemberMap-drop {
+  0% {
+    transform: translateY(-60px) scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .MemberMapPin,
+  .MemberMapPin::after,
+  .MemberMapStack::after {
+    animation: none !important;
+  }
+}
+
+// ------------------------------------------------------------------ cards
+
+.MemberMapPopup {
+  .maplibregl-popup-content {
+    padding: 14px 16px;
+    border-radius: 12px;
     background: var(--body-bg);
     color: var(--text-color);
-    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
-  }
-  .leaflet-popup-content {
-    margin: 12px 14px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
     font-size: 14px;
   }
-  .leaflet-container a.leaflet-popup-close-button,
-  a.leaflet-popup-close-button {
-    color: var(--muted-color);
+  &.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+  &.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+  &.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+    border-top-color: var(--body-bg);
+  }
+  &.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+  &.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+  &.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+    border-bottom-color: var(--body-bg);
+  }
+  &.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+    border-right-color: var(--body-bg);
+  }
+  &.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+    border-left-color: var(--body-bg);
+  }
+  .maplibregl-popup-close-button {
     width: 28px;
     height: 28px;
     font-size: 20px;
-    line-height: 26px;
+    color: var(--muted-color);
+    border-radius: 6px;
+    &:hover {
+      background: var(--control-bg);
+    }
   }
 }
 
-.MemberMap-pin {
-  background: none;
-  border: 0;
-  .Avatar {
-    --size: 36px;
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
-    line-height: 36px;
-    border: 2px solid var(--body-bg);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-    box-sizing: border-box;
+.MemberMapCard {
+  min-width: 200px;
+  &-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding-right: 20px;
   }
-}
-
-.MemberMap-cluster {
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--primary-color);
-  color: var(--button-primary-color, #fff);
-  font-weight: bold;
-  font-size: 14px;
-  border: 3px solid var(--body-bg);
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
-  box-sizing: border-box;
-  &--medium {
+  &-who {
+    min-width: 0;
+  }
+  // Focused for keyboard users when the card opens; no ring after a mouse click.
+  .MemberMapCard-name:focus:not(:focus-visible) {
+    outline: none;
+  }
+  .MemberMapCard-name,
+  .MemberMapCard-name:hover {
+    display: block;
+    font-weight: bold;
+    font-size: 15px;
+    color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &-place {
+    color: var(--muted-color);
     font-size: 13px;
   }
-  &--large {
-    font-size: 12px;
+  &-facts {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    color: var(--text-color);
+    font-size: 13px;
+    li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 0;
+    }
+    .icon {
+      width: 14px;
+      color: var(--muted-color);
+    }
   }
-}
-
-.MemberMapPopup {
   &-count {
     font-weight: bold;
     color: var(--muted-color);
@@ -191,24 +586,31 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    // Short enough to fit above a marker near the top of a phone's map, which can't pan further north.
-    max-height: ~"min(240px, 24vh)";
+    max-height: ~"min(260px, 32vh)";
     overflow-y: auto;
   }
-  .MemberMapPopup-member,
-  .MemberMapPopup-member:hover {
+  .MemberMapCard-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 0;
+    width: 100%;
+    padding: 5px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
     color: var(--text-color);
-    text-decoration: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
     min-width: 0;
+    &:hover,
+    &:focus-visible {
+      background: var(--control-bg);
+    }
   }
-  .MemberMapPopup-member:hover .MemberMapPopup-name {
-    text-decoration: underline;
-  }
-  &-name {
+  &-rowName {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -217,45 +619,160 @@
     margin-top: 4px;
     color: var(--muted-color);
   }
-  .MemberMapPopup-zoom {
+  .MemberMapCard-zoom {
     margin-top: 6px;
     padding: 0;
     color: var(--link-color, var(--primary-color));
+  }
+  &-meetupTitle {
+    font-weight: bold;
+    font-size: 15px;
+    margin-bottom: 8px;
+    padding-right: 20px;
+    color: var(--text-color);
+    .icon {
+      color: #db2777;
+    }
+  }
+  .Button--block {
+    width: 100%;
   }
 }
 
 .MemberMap-avatar {
   flex-shrink: 0;
   display: inline-flex;
-  .Avatar {
+  .Avatar--size24 {
     --size: 24px;
     width: 24px;
     height: 24px;
     font-size: 12px;
     line-height: 24px;
   }
+  .Avatar--size48 {
+    --size: 48px;
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+    line-height: 48px;
+  }
+}
+
+// Phones: the card slides up from the bottom.
+.MemberMapSheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1060;
+  max-height: 70svh;
+  overflow-y: auto;
+  padding: 4px 16px calc(16px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: var(--body-bg);
+  color: var(--text-color);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.25);
+  animation: MemberMap-sheet 0.22s ease-out;
+  &-handle {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 12px;
+    touch-action: none;
+    cursor: grab;
+    span {
+      width: 40px;
+      height: 5px;
+      border-radius: 3px;
+      background: var(--control-bg);
+    }
+  }
+  .MemberMapSheet-close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    color: var(--muted-color);
+  }
+}
+
+@keyframes MemberMap-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+// ------------------------------------------------------------------ list, near, meetups, trips
+
+.MemberMapList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(~"min(300px, 100%)", 1fr));
+  gap: 16px 24px;
+  &-country {
+    min-width: 0;
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: var(--heading-color, var(--text-color));
+    }
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    li {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: 'member show' 'meta show';
+      align-items: center;
+      column-gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--control-bg);
+      .Button {
+        grid-area: show;
+      }
+    }
+  }
+  &-count {
+    color: var(--muted-color);
+    font-weight: normal;
+  }
+  .MemberMapList-member,
+  .MemberMapList-member:hover {
+    grid-area: member;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--text-color);
+  }
+  &-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &-meta {
+    grid-area: meta;
+    padding-left: 32px;
+    color: var(--muted-color);
+    font-size: 12px;
+    min-width: 0;
+  }
 }
 
 .MemberMapNear {
   min-width: 0;
-  &-heading {
-    margin: 0 0 8px;
-    font-size: 15px;
-    color: var(--heading-color, var(--text-color));
-  }
   &-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(~"min(240px, 100%)", 1fr));
-    gap: 0 24px;
   }
   &-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 0;
+    padding: 3px 0;
     min-width: 0;
   }
   .MemberMapNear-member,
@@ -266,10 +783,6 @@
     flex: 1;
     min-width: 0;
     color: var(--text-color);
-    text-decoration: none;
-  }
-  .MemberMapNear-member:hover .MemberMapNear-name {
-    text-decoration: underline;
   }
   &-name {
     overflow: hidden;
@@ -287,8 +800,50 @@
   }
 }
 
-.MemberMapLocationModal {
-  &-search {
+.MemberMapMeetups,
+.MemberMapTrips {
+  min-width: 0;
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 6px 0;
+    color: var(--text-color);
+    min-width: 0;
+    > .icon {
+      margin-top: 3px;
+      color: var(--muted-color);
+    }
+  }
+  .Button--link {
+    margin-left: auto;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+.MemberMapMeetups {
+  .MemberMapMeetups-title {
+    font-weight: bold;
+    color: var(--text-color);
+  }
+  &-meta {
+    font-size: 12px;
+    color: var(--muted-color);
+  }
+  li > .icon {
+    color: #db2777;
+  }
+}
+
+// ------------------------------------------------------------------ forms
+
+.MemberMapPlaceSearch {
+  &-row {
     display: flex;
     gap: 8px;
     .FormControl {
@@ -308,7 +863,7 @@
       padding: 8px 10px;
     }
   }
-  .MemberMapLocationModal-result {
+  .MemberMapPlaceSearch-result {
     display: block;
     width: 100%;
     padding: 8px 10px;
@@ -328,24 +883,31 @@
       font-weight: bold;
     }
   }
+}
+
+.MemberMapDates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  label {
+    flex: 1 1 140px;
+    min-width: 0;
+    font-weight: bold;
+    color: var(--text-color);
+  }
+  .FormControl {
+    margin-top: 4px;
+  }
+}
+
+.MemberMapLocationModal {
   .MemberMapLocationModal-pinToggle {
     padding-left: 0;
     padding-right: 0;
     color: var(--link-color, var(--primary-color));
   }
-  .MemberMapLocationModal-map {
-    height: 240px;
-    min-height: 0;
-    cursor: crosshair;
-  }
-  &-marker {
-    border-radius: 50%;
-    background: var(--primary-color);
-    border: 3px solid var(--body-bg);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-    box-sizing: border-box;
-  }
-  &-precision {
+  &-precision,
+  &-who {
     border: 0;
     padding: 0;
     margin: 0 0 16px;
@@ -366,5 +928,153 @@
       display: inline-block;
       vertical-align: middle;
     }
+  }
+}
+
+.MemberMapPinMap.MemberMap {
+  height: 240px;
+  min-height: 0;
+}
+.MemberMapPinMap-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  border: 3px solid var(--body-bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+}
+
+// ------------------------------------------------------------------ profile mini-map and widget
+
+.MemberMapMini {
+  position: relative;
+  display: block;
+  height: 120px;
+  margin: 16px 0 0;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  background: var(--control-bg);
+  isolation: isolate;
+  &-tiles {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 512px;
+    height: 512px;
+    img {
+      position: absolute;
+      width: 256px;
+      height: 256px;
+      max-width: none;
+    }
+  }
+  &.is-dark .MemberMapMini-tiles {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85);
+  }
+  &-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 3px solid #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    box-sizing: border-box;
+  }
+  &-label {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--body-bg);
+    color: var(--text-color);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.MemberMapWidget {
+  color: var(--text-color);
+  &-title {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: var(--heading-color, var(--text-color));
+  }
+  &-line {
+    margin: 0 0 8px;
+    color: var(--muted-color);
+    font-size: 13px;
+  }
+  &-list {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 0;
+      font-size: 13px;
+      min-width: 0;
+    }
+  }
+  &-country {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &-count {
+    color: var(--muted-color);
+  }
+  .MemberMapWidget-open {
+    font-size: 13px;
+    color: var(--link-color, var(--primary-color));
+  }
+}
+
+// ------------------------------------------------------------------ phones
+
+@media @phone {
+  .MemberMapPage-toolbar {
+    flex-wrap: nowrap;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .MemberMapSearch {
+    max-width: none;
+    flex-basis: auto;
+  }
+  // Chips scroll sideways rather than wrapping into a wall.
+  .MemberMapPage-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    margin: 0 -15px;
+    padding-left: 15px;
+    padding-right: 15px;
+    scrollbar-width: none;
+  }
+  // A full-screen map, edge to edge, under the header.
+  .MemberMapPage-mapWrap {
+    margin: 0 -15px;
+  }
+  .MemberMap:not(.MemberMapPinMap) {
+    height: calc(100vh - 46px);
+    height: calc(100svh - 46px);
+    max-height: none;
+    border-radius: 0;
+  }
+  .MemberMapPage.has-sheet .MemberMap .maplibregl-ctrl-bottom-right {
+    display: none;
   }
 }

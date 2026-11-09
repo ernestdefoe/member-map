@@ -45,15 +45,31 @@ class UserFields
                         return null;
                     }
 
-                    return $this->deferred($context, $user, fn (Location $row) => $row->show_on_profile ? $row->label : null);
+                    return $this->deferred($context, $user, fn (Location $row) => $this->shown($row, $context) ? $row->label : null);
+                }),
+
+            // The same place as a point, for the profile's mini-map: the rounded centre the map already shows.
+            Attribute::make('memberMapPoint')
+                ->get(function (User $user, Context $context) {
+                    if (! $this->settings->get(Settings::PROFILE) || ! $context->getActor()->can(Settings::VIEW)) {
+                        return null;
+                    }
+
+                    return $this->deferred($context, $user, fn (Location $row) => $this->shown($row, $context) ? [$row->lat, $row->lng, $row->precision] : null);
                 }),
 
             Attribute::make('memberMapOwn')
                 ->visible(fn (User $user, Context $context) => $context->getActor()->id === $user->id)
                 ->get(fn (User $user, Context $context) => $this->deferred($context, $user, fn (Location $row) => MapController::own(
-                    $row->lat, $row->lng, $row->label, $row->precision, $row->show_on_profile, $user->can(Settings::LIST),
+                    $row->lat, $row->lng, $row->label, $row->precision, $row->show_on_profile, (bool) $row->members_only, $user->can(Settings::LIST),
                 ))),
         ];
+    }
+
+    /** Shown on profiles: the member chose it, and asked to be seen by guests too if the viewer is one. */
+    private function shown(Location $row, Context $context): bool
+    {
+        return $row->show_on_profile && ! ($row->members_only && $context->getActor()->isGuest());
     }
 
     /** Queue the user, and answer once every queued user's row is loaded. */

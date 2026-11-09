@@ -39,7 +39,7 @@ class Geocoder
     /**
      * Places matching what a member typed.
      *
-     * @return list<array{label: string, lat: float, lng: float}>
+     * @return list<array{label: string, lat: float, lng: float, bbox: list<float>|null}>
      */
     public function search(string $query, string $locale): array
     {
@@ -55,10 +55,13 @@ class Geocoder
             if (! isset($result['lat'], $result['lon'], $result['display_name'])) {
                 continue;
             }
+            // Nominatim's boundingbox is [south, north, west, east]: the map flies to fit it.
+            $box = is_array($result['boundingbox'] ?? null) && count($result['boundingbox']) === 4 ? array_map('floatval', $result['boundingbox']) : null;
             $places[] = [
                 'label' => (string) $result['display_name'],
                 'lat' => (float) $result['lat'],
                 'lng' => (float) $result['lon'],
+                'bbox' => $box,
             ];
         }
 
@@ -69,7 +72,7 @@ class Geocoder
      * The named place of the given size around a point: its centre, rounded,
      * and its name. The point itself is never returned, so it is never stored.
      *
-     * @return array{lat: float, lng: float, label: string}|null null when there is no such place there (open sea)
+     * @return array{lat: float, lng: float, label: string, country_code: string|null, region: string|null, timezone: string|null}|null null when there is no such place there (open sea)
      */
     public function place(float $lat, float $lng, string $precision, string $locale): ?array
     {
@@ -96,11 +99,18 @@ class Geocoder
         }
 
         $decimals = Precision::decimals($precision);
+        $lat = round((float) $result['lat'], $decimals);
+        $lng = round((float) $result['lon'], $decimals);
+        $countryCode = strtolower((string) ($result['address']['country_code'] ?? '')) ?: null;
+        $region = isset($result['address']['ISO3166-2-lvl4']) ? (string) $result['address']['ISO3166-2-lvl4'] : null;
 
         return [
-            'lat' => round((float) $result['lat'], $decimals),
-            'lng' => round((float) $result['lon'], $decimals),
+            'lat' => $lat,
+            'lng' => $lng,
             'label' => $label,
+            'country_code' => $countryCode && strlen($countryCode) === 2 ? $countryCode : null,
+            'region' => $region,
+            'timezone' => Timezones::guess($countryCode, $lat, $lng, $precision, $region),
         ];
     }
 
