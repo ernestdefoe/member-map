@@ -1044,7 +1044,10 @@ export default class MapPage extends Page {
           e.stopPropagation();
           this.select({ kind: 'meetup', meetup }, [meetup[2], meetup[1]]);
         });
-        this.layerMarkers.push(this.marker(button, [meetup[2], meetup[1]], { anchor: 'bottom' }));
+        // Above a member stack in the same city, not hidden under it.
+        const marker = this.marker(button, [meetup[2], meetup[1]], { anchor: 'bottom', offset: [0, -24] });
+        marker.getElement().classList.add('MemberMapMarker--meetup');
+        this.layerMarkers.push(marker);
       }
     }
   }

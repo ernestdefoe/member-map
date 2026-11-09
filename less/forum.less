@@ -273,6 +273,9 @@
 // MapLibre moves this wrapper (it owns its transform); everything below styles what's inside it.
 .MemberMapMarker {
   line-height: 0;
+  &--meetup {
+    z-index: 2;
+  }
   // Behind the globe MapLibre sets opacity 0: nor should it catch a tap.
   &[style*='opacity: 0'] {
     pointer-events: none;
