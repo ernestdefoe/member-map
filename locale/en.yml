@@ -1,0 +1,88 @@
+ernestdefoe-member-map:
+  admin:
+    permissions:
+      view: View the member map
+      list: Appear on the member map
+    settings:
+      tiles_heading: Map tiles
+      tiles_url: Map tile address
+      tiles_url_help: "The tile address your map provider gives you, written the way Leaflet expects it (as in the example). Leave empty for OpenStreetMap, which needs no key."
+      tiles_dark_url: Map tile address in dark mode
+      tiles_dark_url_help: Optional. Leave empty to show the normal map darkened.
+      attribution: Map credit
+      attribution_help: "The credit shown in the corner of the map. Most map providers require one. Simple HTML links are allowed."
+      geocoder_heading: Place search
+      geocoder_url: Place search address
+      geocoder_url_help: "Leave empty for OpenStreetMap's free Nominatim service. Any service with the same API works, such as your own Nominatim or LocationIQ. Searches run on your server, one a second at most, and every answer is saved for 30 days."
+      geocoder_key: Place search API key
+      geocoder_key_help: Optional. Only for services that need one. It is never sent to browsers.
+      geocoder_email: Contact email for the place search
+      geocoder_email_help: "Optional. Nominatim asks busy sites for an address it can write to if something goes wrong."
+      display_heading: Display
+      nav: Show a Member map link in the forum sidebar
+      profile: Let members show their location on their profile and user card
+
+  forum:
+    nav: Member map
+    page:
+      title: Member map
+      intro: "Members who chose to share roughly where they are. Nobody is on the map unless they add themselves."
+      guest: Log in to see the member map.
+      no_permission: You don't have permission to see the member map.
+      add_me: Add me to the map
+      change: Change my location
+      remove: Remove me from the map
+      you_are: "You're shown at {label}."
+      not_listed: "Your location is saved, but you can't appear on the map right now."
+      empty: Nobody has added themselves to the map yet.
+      load_error: "The map couldn't load. Try again in a minute."
+      zoom_in: Zoom in here
+      more: "and {count} more"
+      members: "{count, plural, one {# member} other {# members}}"
+      reset_view: Show everyone
+    near:
+      heading: Near you
+      add_prompt: Add yourself to the map to see who lives near you.
+      none: Nobody else is on the map yet.
+      same_area: In your area
+      km: "about {count} km"
+      mi: "about {count} mi"
+      show: "Show {name} on the map"
+    location:
+      title: Your place on the map
+      search_label: Search for your city, region or country
+      search_placeholder: "For example: Nashville"
+      search: Search
+      no_results: "No places found. Try another spelling, or drop a pin on the map."
+      or_pin: Or drop a pin on the map
+      pin_help: Tap or click the map where you are. Only the place around it is saved, never the pin.
+      precision_label: How exactly should you be shown?
+      precision:
+        city: City
+        region: Region or state
+        country: Country only
+      preview: "You'll be shown as: {label}"
+      preview_loading: Looking up the place…
+      profile: Show this on my profile and user card
+      save: Save
+      saved: Your place on the map is saved.
+      removed: You've been removed from the map.
+      pick_first: Search for a place or drop a pin first.
+      finer: To be shown more exactly, search for your place or drop a pin.
+    errors:
+      member_map_bad_query: Type at least two letters to search.
+      member_map_bad_point: That place couldn't be read. Try again.
+      member_map_no_place: "There's no city or country there. Try a spot on land, or search instead."
+      member_map_slow_down: "Too many lookups at once. Wait a minute and try again."
+      member_map_unavailable: "The place search isn't answering right now. Try again in a minute."
+    settings:
+      heading: Member map
+      none: "You're not on the member map."
+      shown_as: "You're shown as {label}."
+    user:
+      location: "{label}"
+
+  lib:
+    gdpr:
+      export: Your place on the member map.
+      delete: Removes your place from the member map.

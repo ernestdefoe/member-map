@@ -1,0 +1,366 @@
+// Member Map. Leaflet's own CSS is injected by the map chunk (map/leaflet.ts),
+// so forum pages that never open a map don't download it.
+// Every colour comes from Flarum's CSS properties: it follows light, dark and themes.
+
+.UserCard-memberMap .icon {
+  margin-right: 2px;
+}
+
+.Settings-memberMap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.MemberMapPage {
+  &-head {
+    margin-bottom: 16px;
+  }
+  &-title {
+    margin: 0 0 4px;
+    font-size: 1.4em;
+    color: var(--heading-color, var(--text-color));
+  }
+  &-intro {
+    margin: 0 0 12px;
+    color: var(--muted-color);
+  }
+  &-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+  &-you {
+    color: var(--text-color);
+    min-width: 0;
+  }
+  &-message {
+    padding: 24px 0;
+    color: var(--muted-color);
+    .Button {
+      margin-top: 8px;
+    }
+  }
+  &-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  &-mapWrap {
+    position: relative;
+    min-width: 0;
+  }
+  &-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    text-align: center;
+    pointer-events: none;
+    p {
+      margin: 0;
+      padding: 10px 14px;
+      border-radius: var(--border-radius);
+      background: var(--body-bg);
+      color: var(--text-color);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+  }
+}
+
+// The map itself. `isolation` keeps Leaflet's panes (z-index up to 1000)
+// inside the map, under Flarum's header, dropdowns and composer.
+.MemberMap {
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+  height: 62vh;
+  min-height: 320px;
+  max-height: 620px;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  background: var(--control-bg);
+  font: inherit;
+  @media @phone {
+    // Leave page above and below to scroll by: a full-screen map traps the finger.
+    height: 58vh;
+    min-height: 280px;
+  }
+
+  &.MemberMap--dark .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85);
+  }
+
+  .leaflet-bar {
+    border: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    a,
+    a:hover {
+      background: var(--body-bg);
+      color: var(--text-color);
+      border-bottom-color: var(--control-bg);
+    }
+    a:hover {
+      background: var(--control-bg);
+    }
+    a.leaflet-disabled {
+      background: var(--body-bg);
+      color: var(--muted-color);
+      opacity: 0.6;
+    }
+  }
+  .leaflet-control-attribution {
+    background: var(--body-bg);
+    color: var(--muted-color);
+    opacity: 0.9;
+    a {
+      color: var(--link-color, var(--primary-color));
+    }
+  }
+  .leaflet-popup-content-wrapper,
+  .leaflet-popup-tip {
+    background: var(--body-bg);
+    color: var(--text-color);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  }
+  .leaflet-popup-content {
+    margin: 12px 14px;
+    font-size: 14px;
+  }
+  .leaflet-container a.leaflet-popup-close-button,
+  a.leaflet-popup-close-button {
+    color: var(--muted-color);
+    width: 28px;
+    height: 28px;
+    font-size: 20px;
+    line-height: 26px;
+  }
+}
+
+.MemberMap-pin {
+  background: none;
+  border: 0;
+  .Avatar {
+    --size: 36px;
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+    line-height: 36px;
+    border: 2px solid var(--body-bg);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    box-sizing: border-box;
+  }
+}
+
+.MemberMap-cluster {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: var(--button-primary-color, #fff);
+  font-weight: bold;
+  font-size: 14px;
+  border: 3px solid var(--body-bg);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  &--medium {
+    font-size: 13px;
+  }
+  &--large {
+    font-size: 12px;
+  }
+}
+
+.MemberMapPopup {
+  &-count {
+    font-weight: bold;
+    color: var(--muted-color);
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  &-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .MemberMapPopup-member,
+  .MemberMapPopup-member:hover {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    color: var(--text-color);
+    text-decoration: none;
+    min-width: 0;
+  }
+  .MemberMapPopup-member:hover .MemberMapPopup-name {
+    text-decoration: underline;
+  }
+  &-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &-more {
+    margin-top: 4px;
+    color: var(--muted-color);
+  }
+  .MemberMapPopup-zoom {
+    margin-top: 6px;
+    padding: 0;
+    color: var(--link-color, var(--primary-color));
+  }
+}
+
+.MemberMap-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  .Avatar {
+    --size: 24px;
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    line-height: 24px;
+  }
+}
+
+.MemberMapNear {
+  min-width: 0;
+  &-heading {
+    margin: 0 0 8px;
+    font-size: 15px;
+    color: var(--heading-color, var(--text-color));
+  }
+  &-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(~"min(240px, 100%)", 1fr));
+    gap: 0 24px;
+  }
+  &-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    min-width: 0;
+  }
+  .MemberMapNear-member,
+  .MemberMapNear-member:hover {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    color: var(--text-color);
+    text-decoration: none;
+  }
+  .MemberMapNear-member:hover .MemberMapNear-name {
+    text-decoration: underline;
+  }
+  &-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &-distance {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--muted-color);
+  }
+  .MemberMapNear-show {
+    flex-shrink: 0;
+    color: var(--muted-color);
+  }
+}
+
+.MemberMapLocationModal {
+  &-search {
+    display: flex;
+    gap: 8px;
+    .FormControl {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+  &-results {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: var(--border-radius);
+    background: var(--control-bg);
+    li.helpText {
+      padding: 8px 10px;
+    }
+  }
+  .MemberMapLocationModal-result {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    background: none;
+    text-align: left;
+    color: var(--control-color, var(--text-color));
+    font: inherit;
+    cursor: pointer;
+    &:hover,
+    &:focus-visible,
+    &.active {
+      background: var(--control-bg-shaded, rgba(0, 0, 0, 0.06));
+      color: var(--text-color);
+    }
+    &.active {
+      font-weight: bold;
+    }
+  }
+  .MemberMapLocationModal-pinToggle {
+    padding-left: 0;
+    padding-right: 0;
+    color: var(--link-color, var(--primary-color));
+  }
+  .MemberMapLocationModal-map {
+    height: 240px;
+    min-height: 0;
+    cursor: crosshair;
+  }
+  &-marker {
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 3px solid var(--body-bg);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    box-sizing: border-box;
+  }
+  &-precision {
+    border: 0;
+    padding: 0;
+    margin: 0 0 16px;
+    legend {
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: var(--text-color);
+    }
+    .checkbox {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text-color);
+    }
+  }
+  &-preview {
+    color: var(--text-color);
+    .LoadingIndicator {
+      display: inline-block;
+      vertical-align: middle;
+    }
+  }
+}
