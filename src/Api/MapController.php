@@ -48,10 +48,12 @@ class MapController implements RequestHandlerInterface
         $me = null;
 
         foreach ($users as $user) {
-            $members[] = [(int) $user->id, (float) $user->mm_lat, (float) $user->mm_lng, $user->display_name, $slugs->toSlug($user), $user->avatar_url];
+            $lat = (float) $user->getAttribute('mm_lat');
+            $lng = (float) $user->getAttribute('mm_lng');
+            $members[] = [(int) $user->id, $lat, $lng, $user->display_name, $slugs->toSlug($user), $user->avatar_url];
 
             if ($user->id === $actor->id) {
-                $me = self::own((float) $user->mm_lat, (float) $user->mm_lng, (string) $user->mm_label, (string) $user->mm_precision, (bool) $user->mm_profile, true);
+                $me = self::own($lat, $lng, (string) $user->getAttribute('mm_label'), (string) $user->getAttribute('mm_precision'), (bool) $user->getAttribute('mm_profile'), true);
             }
         }
 

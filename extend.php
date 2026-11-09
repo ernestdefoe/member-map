@@ -16,6 +16,7 @@
 use ErnestDefoe\MemberMap\Api;
 use ErnestDefoe\MemberMap\Gdpr\MemberMapData;
 use ErnestDefoe\MemberMap\Http\MapPageContent;
+use ErnestDefoe\MemberMap\Location;
 use ErnestDefoe\MemberMap\Settings;
 use Flarum\Api\Context;
 use Flarum\Api\Resource\ForumResource;
@@ -23,6 +24,7 @@ use Flarum\Api\Resource\UserResource;
 use Flarum\Api\Schema;
 use Flarum\Extend;
 use Flarum\Gdpr\Extend\UserData;
+use Flarum\User\Event\Deleted;
 
 return [
     (new Extend\Frontend('forum'))
@@ -66,6 +68,10 @@ return [
         ->serializeToForum('memberMapAttribution', Settings::ATTRIBUTION, fn ($value) => trim((string) $value) ?: Settings::DEFAULT_ATTRIBUTION)
         ->serializeToForum('memberMapNav', Settings::NAV, 'boolval')
         ->serializeToForum('memberMapProfile', Settings::PROFILE, 'boolval'),
+
+    // The foreign key does this too, where the database enforces it (SQLite may not).
+    (new Extend\Event())
+        ->listen(Deleted::class, fn (Deleted $event) => Location::query()->where('user_id', $event->user->id)->delete()),
 
     (new Extend\Conditional())
         ->whenExtensionEnabled('flarum-gdpr', fn () => [
