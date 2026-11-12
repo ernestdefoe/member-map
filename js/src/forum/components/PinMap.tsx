@@ -1,6 +1,7 @@
 import Component from 'flarum/common/Component';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import type Mithril from 'mithril';
+import { t } from '../api';
 
 declare const m: Mithril.Static;
 
@@ -18,14 +19,20 @@ export default class PinMap extends Component<{
   handle: any = null;
   pin: any = null;
   private shown = '';
+  private failed = false;
 
   oninit(vnode: Mithril.Vnode<any, this>) {
     super.oninit(vnode);
-    import('../map/engine').then(async (module) => {
-      await module.prepare();
-      this.engine = module;
-      m.redraw();
-    });
+    import('../map/engine')
+      .then(async (module) => {
+        await module.prepare();
+        this.engine = module;
+      })
+      .catch((error) => {
+        console.error('Member map:', error);
+        this.failed = true;
+      })
+      .finally(() => m.redraw());
   }
 
   /** A place picked from the search moves the pin here too. */
@@ -40,6 +47,7 @@ export default class PinMap extends Component<{
   }
 
   view() {
+    if (this.failed) return <p className="helpText">{t('location.pin_failed')}</p>;
     if (!this.engine) return <LoadingIndicator />;
     return <div className="MemberMap MemberMapPinMap" oncreate={(vnode: Mithril.VnodeDOM) => this.create(vnode.dom as HTMLElement)} />;
   }

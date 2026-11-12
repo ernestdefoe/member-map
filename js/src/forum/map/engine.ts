@@ -1,6 +1,8 @@
 import app from 'flarum/forum/app';
 import * as maplibregl from 'maplibre-gl';
 import css from './mapCss';
+// @ts-ignore a string, from webpack.config.js
+import workerSource from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker-source';
 import { isDark } from '../theme';
 
 /*
@@ -14,21 +16,19 @@ import { isDark } from '../theme';
  */
 
 let injected = false;
-let worker: Promise<void> | null = null;
+let worker: string | null = null;
 
 /**
- * MapLibre's worker, started from a same-origin blob of the published file:
- * a worker can't be loaded straight from another origin, and forums often
- * serve assets from a CDN. Call (and wait for) this before the first map.
+ * MapLibre's worker, started from a blob of its code. The code is bundled in
+ * this chunk as a string (webpack.config.js, `?worker-source`), so the map
+ * needs no file of its own on the forum: Flarum, a CDN or a subfolder install
+ * can't leave it unpublished or at another address. Call (and wait for) this
+ * before the first map.
  */
-export function prepare(): Promise<void> {
-  worker ||= fetch(app.forum.attribute<string>('assetsBaseUrl') + '/js/ernestdefoe-member-map/forum/map/maplibre-worker.js')
-    .then((response) => {
-      if (!response.ok) throw new Error('Map worker ' + response.status);
-      return response.text();
-    })
-    .then((code) => maplibregl.setWorkerUrl(URL.createObjectURL(new Blob([code], { type: 'text/javascript' }))));
-  return worker;
+export async function prepare(): Promise<void> {
+  if (worker) return;
+  worker = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+  maplibregl.setWorkerUrl(worker);
 }
 
 function ensureCss(): void {

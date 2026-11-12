@@ -139,6 +139,8 @@ export default class MapPage extends Page {
   phone = window.matchMedia('(max-width: 767px)');
   miles = usesMiles();
   supported = true;
+  /** The map engine couldn't start (a chunk failed to load, say): the list shows, with a note why. */
+  mapFailed = false;
   justAdded: number | null = null;
 
   handle: any = null;
@@ -270,6 +272,7 @@ export default class MapPage extends Page {
             </div>
           )}
         </div>
+        {this.mapFailed && <p className="MemberMapPage-mapFailed">{t('page.map_failed')}</p>}
         {(this.mode === 'list' || !this.supported) && this.list()}
       </div>,
       <div className="MemberMapPage-below">
@@ -827,30 +830,41 @@ export default class MapPage extends Page {
   // ---------------------------------------------------------------- map
 
   createMap(element: HTMLElement) {
-    loadEngine().then(async (module) => {
-      await module.prepare();
-      if (!module.supported()) {
+    loadEngine()
+      .then(async (module) => {
+        await module.prepare();
+        if (!module.supported()) {
+          this.supported = false;
+          this.mode = 'list';
+          m.redraw();
+          return;
+        }
+        if (!element.isConnected) return;
+        this.startMap(module, element);
+      })
+      .catch((error) => {
+        console.error('Member map:', error);
         this.supported = false;
+        this.mapFailed = true;
         this.mode = 'list';
         m.redraw();
-        return;
-      }
-      if (!element.isConnected) return;
+      });
+  }
 
-      this.handle = module.createMap(element, { zoom: 0.6, onStyle: (map: any) => this.addSource(map) });
-      this.map = this.handle.map;
-      this.map.on('render', () => this.queueSync());
-      this.map.on('click', () => {
-        if (this.phone.matches && this.selected) {
-          this.close();
-          m.redraw();
-        }
-      });
-      this.map.once('load', () => {
-        this.ready = true;
-        this.intro();
-        this.deepLink();
-      });
+  startMap(module: any, element: HTMLElement) {
+    this.handle = module.createMap(element, { zoom: 0.6, onStyle: (map: any) => this.addSource(map) });
+    this.map = this.handle.map;
+    this.map.on('render', () => this.queueSync());
+    this.map.on('click', () => {
+      if (this.phone.matches && this.selected) {
+        this.close();
+        m.redraw();
+      }
+    });
+    this.map.once('load', () => {
+      this.ready = true;
+      this.intro();
+      this.deepLink();
     });
   }
 

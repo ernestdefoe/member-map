@@ -3,8 +3,8 @@
   "name": "@ernestdefoe/member-map",
   "version": "0.1.0",
   "scripts": {
-    "dev": "node scripts/copy-worker.mjs && webpack --mode development --watch",
-    "build": "webpack --mode production && node scripts/copy-worker.mjs",
+    "dev": "webpack --mode development --watch",
+    "build": "webpack --mode production",
     "format": "prettier --write src",
     "format-check": "prettier --check src"
   },
