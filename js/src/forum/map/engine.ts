@@ -27,8 +27,36 @@ let worker: string | null = null;
  */
 export async function prepare(): Promise<void> {
   if (worker) return;
+  await blobWorkersAllowed();
   worker = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
   maplibregl.setWorkerUrl(worker);
+}
+
+/**
+ * A Content-Security-Policy without blob: in worker-src (or script-src) blocks
+ * the worker, and MapLibre only reports that later as a map error, leaving a
+ * blank map. A tiny worker started the same way finds out first, so callers
+ * can show the list instead.
+ */
+function blobWorkersAllowed(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob(['postMessage(1)'], { type: 'text/javascript' }));
+    let probe: Worker;
+    const done = (error?: Error) => {
+      clearTimeout(timer);
+      probe?.terminate();
+      URL.revokeObjectURL(url);
+      error ? reject(error) : resolve();
+    };
+    const timer = setTimeout(() => done(new Error('Map worker did not start (Content-Security-Policy?)')), 5000);
+    try {
+      probe = new Worker(url);
+    } catch (error) {
+      return done(error as Error);
+    }
+    probe.onmessage = () => done();
+    probe.onerror = () => done(new Error('Map worker blocked (Content-Security-Policy worker-src needs blob:)'));
+  });
 }
 
 function ensureCss(): void {
