@@ -41,12 +41,16 @@ class TripTest extends TestCase
         $container->instance(Geocoder::class, $container->make(FakeGeocoder::class));
     }
 
-    /** @return array{int, array<string, mixed>|null} */
-    private function post(array $body): array
+    /** @return array{int, array<string, mixed>|null} the status and the answer, the trip (id + attributes) as `trip` */
+    private function post(array $attributes): array
     {
-        $response = $this->send($this->request('POST', '/api/member-map/trips', ['authenticatedAs' => 2, 'json' => $body]));
+        $response = $this->send($this->request('POST', '/api/member-map-trips', ['authenticatedAs' => 2, 'json' => ['data' => ['type' => 'member-map-trips', 'attributes' => $attributes]]]));
+        $body = json_decode((string) $response->getBody(), true);
+        if (isset($body['data'])) {
+            $body['trip'] = ['id' => $body['data']['id']] + $body['data']['attributes'];
+        }
 
-        return [$response->getStatusCode(), json_decode((string) $response->getBody(), true)];
+        return [$response->getStatusCode(), $body];
     }
 
     private function days(int $n): string
@@ -103,9 +107,22 @@ class TripTest extends TestCase
         [, $body] = $this->post(['lat' => 36.15, 'lng' => -86.78, 'starts' => $this->days(1), 'ends' => $this->days(2)]);
         $id = $body['trip']['id'];
 
-        $this->assertSame(404, $this->send($this->request('DELETE', "/api/member-map/trips/$id", ['authenticatedAs' => 3]))->getStatusCode());
-        $this->assertSame(204, $this->send($this->request('DELETE', "/api/member-map/trips/$id", ['authenticatedAs' => 2]))->getStatusCode());
+        $this->assertSame(404, $this->send($this->request('DELETE', "/api/member-map-trips/$id", ['authenticatedAs' => 3]))->getStatusCode());
+        $this->assertSame(204, $this->send($this->request('DELETE', "/api/member-map-trips/$id", ['authenticatedAs' => 2]))->getStatusCode());
         $this->assertSame(0, Trip::query()->count());
         $this->assertSame(0, $this->database()->table('notifications')->where('type', 'memberMapTripNearby')->where('is_deleted', false)->count());
+    }
+
+    #[Test]
+    public function the_neighbors_are_told_by_a_queued_job_not_by_the_request()
+    {
+        $this->fake();
+        $queue = new \Illuminate\Support\Testing\Fakes\QueueFake($this->app()->getContainer());
+        $this->app()->getContainer()->instance(\Illuminate\Contracts\Queue\Queue::class, $queue);
+
+        $this->assertSame(201, $this->post(['lat' => 36.15, 'lng' => -86.78, 'starts' => $this->days(3), 'ends' => $this->days(7)])[0]);
+
+        $queue->assertPushed(\ErnestDefoe\MemberMap\Job\NotifyNearbyMembers::class);
+        $this->assertSame(0, $this->database()->table('notifications')->where('type', 'memberMapTripNearby')->count());
     }
 }

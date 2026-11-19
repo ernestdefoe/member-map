@@ -2,8 +2,7 @@
 
 namespace ErnestDefoe\MemberMap;
 
-use Carbon\Carbon;
-use Flarum\Extension\ExtensionManager;
+use ErnestDefoe\MemberMap\Integrations\Suspension;
 use Flarum\Group\Group;
 use Flarum\User\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,7 +18,7 @@ class MemberQuery
     /** Upper bound on markers in one answer, so a huge forum can't send megabytes. */
     public const MAX = 10000;
 
-    public function __construct(private readonly ExtensionManager $extensions)
+    public function __construct(private readonly Suspension $suspension)
     {
     }
 
@@ -51,14 +50,12 @@ class MemberQuery
         $granted = fn ($sub) => $sub->select('group_id')->from('group_permission')->where('permission', $permission);
 
         $query->where(fn ($q) => $q
-            ->whereExists(fn ($sub) => $sub->selectRaw('1')->from('group_permission')->where('permission', $permission)->where('group_id', Group::MEMBER_ID))
+            ->whereExists(fn ($sub) => $sub->from('group_permission')->where('permission', $permission)->where('group_id', Group::MEMBER_ID))
             ->orWhereIn('users.id', fn ($sub) => $sub->select('user_id')->from('group_user')->where(fn ($in) => $in
                 ->where('group_id', Group::ADMINISTRATOR_ID)
                 ->orWhereIn('group_id', $granted))));
 
-        if ($this->extensions->isEnabled('flarum-suspend')) {
-            $query->where(fn ($q) => $q->whereNull('users.suspended_until')->orWhere('users.suspended_until', '<', Carbon::now()));
-        }
+        $this->suspension->exclude($query);
 
         return $query;
     }

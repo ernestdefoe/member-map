@@ -2,7 +2,6 @@
 
 namespace ErnestDefoe\MemberMap;
 
-use Carbon\Carbon;
 use ErnestDefoe\MemberMap\Notification\TripNearbyBlueprint;
 use Flarum\Notification\NotificationSyncer;
 use Flarum\User\User;
@@ -52,12 +51,6 @@ class Trips
     public function forget(Trip $trip, User $traveler): void
     {
         $this->notifications->delete(new TripNearbyBlueprint($trip, $traveler));
-    }
-
-    /** Ended trips are kept a month (notifications still name them), then deleted. */
-    public static function prune(): void
-    {
-        Trip::query()->where('ends_on', '<', Carbon::today()->subDays(30)->toDateString())->delete();
     }
 
     public static function km(float $lat1, float $lng1, float $lat2, float $lng2): float

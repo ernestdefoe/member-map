@@ -24,7 +24,7 @@ class LocationTest extends TestCase
         $this->extension('ernestdefoe-member-map');
 
         $this->prepareDatabase([
-            User::class => [$this->normalUser()],
+            User::class => [$this->normalUser(), ['id' => 3, 'username' => 'other', 'email' => 'other@machine.local', 'is_email_confirmed' => 1]],
             'group_permission' => [
                 ['group_id' => Group::MEMBER_ID, 'permission' => 'member-map.view'],
                 ['group_id' => Group::MEMBER_ID, 'permission' => 'member-map.list'],
@@ -41,12 +41,25 @@ class LocationTest extends TestCase
         return $this->geocoder;
     }
 
-    /** @return array{int, array<string, mixed>|null} */
-    private function post(array $body, ?int $as = 2): array
+    /**
+     * A new point is a POST (it replaces the member's place); only who sees it is a PATCH.
+     *
+     * @return array{int, array<string, mixed>|null} the status and the answer, its attributes as `place`
+     */
+    private function post(array $attributes, ?int $as = 2): array
     {
-        $response = $this->send($this->request('POST', '/api/member-map/location', array_filter(['authenticatedAs' => $as, 'json' => $body])));
+        $create = array_key_exists('lat', $attributes);
+        $request = $this->request($create ? 'POST' : 'PATCH', '/api/member-map-locations'.($create ? '' : '/'.$as), array_filter([
+            'authenticatedAs' => $as,
+            'json' => ['data' => array_filter(['type' => 'member-map-locations', 'id' => $create ? null : (string) $as, 'attributes' => $attributes])],
+        ]));
+        $response = $this->send($request);
+        $body = json_decode((string) $response->getBody(), true);
+        if (isset($body['data']['attributes'])) {
+            $body['place'] = $body['data']['attributes'];
+        }
 
-        return [$response->getStatusCode(), json_decode((string) $response->getBody(), true)];
+        return [$response->getStatusCode(), $body];
     }
 
     #[Test]
@@ -56,7 +69,7 @@ class LocationTest extends TestCase
 
         [$status, $body] = $this->post(['lat' => 36.15123, 'lng' => -86.78456, 'precision' => 'city', 'profile' => true]);
 
-        $this->assertSame(200, $status);
+        $this->assertSame(201, $status);
         $this->assertSame('Nashville, United States', $body['place']['label']);
 
         $row = Location::find(2);
@@ -73,10 +86,10 @@ class LocationTest extends TestCase
     {
         $this->fake();
 
-        $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city', 'timezone' => 'America/Indiana/Tell_City']);
+        $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city', 'browserTimezone' => 'America/Indiana/Tell_City']);
         $this->assertSame('America/Indiana/Tell_City', Location::find(2)->timezone);
 
-        $this->post(['lat' => 36.15, 'lng' => -86.79, 'precision' => 'city', 'timezone' => 'Europe/Paris']);
+        $this->post(['lat' => 36.15, 'lng' => -86.79, 'precision' => 'city', 'browserTimezone' => 'Europe/Paris']);
         $this->assertSame('America/Chicago', Location::find(2)->timezone);
     }
 
@@ -134,7 +147,7 @@ class LocationTest extends TestCase
     {
         $geocoder = $this->fake();
 
-        $this->assertSame(200, $this->post(['lat' => 36.15, 'lng' => 273.22, 'precision' => 'city'])[0]);
+        $this->assertSame(201, $this->post(['lat' => 36.15, 'lng' => 273.22, 'precision' => 'city'])[0]);
         $this->assertSame(1, $geocoder->calls);
     }
 
@@ -143,7 +156,7 @@ class LocationTest extends TestCase
     {
         $this->fake();
 
-        // A guest never reaches the controller: no CSRF token, no session.
+        // A guest never reaches the resource: no CSRF token, no session.
         $this->assertContains($this->post(['lat' => 36, 'lng' => -86, 'precision' => 'city'], null)[0], [400, 401]);
     }
 
@@ -199,7 +212,7 @@ class LocationTest extends TestCase
         $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city']);
         $this->database()->table('group_permission')->where('permission', 'member-map.list')->delete();
 
-        $response = $this->send($this->request('DELETE', '/api/member-map/location', ['authenticatedAs' => 2]));
+        $response = $this->send($this->request('DELETE', '/api/member-map-locations/2', ['authenticatedAs' => 2]));
 
         $this->assertSame(204, $response->getStatusCode());
         $this->assertNull(Location::find(2));
@@ -223,5 +236,46 @@ class LocationTest extends TestCase
             $statuses[] = $search('Nashville')->getStatusCode();
         }
         $this->assertContains(429, $statuses);
+    }
+
+    #[Test]
+    public function saving_again_moves_the_one_place_a_member_has()
+    {
+        $this->fake();
+
+        $this->assertSame(201, $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city'])[0]);
+        $this->assertSame(201, $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'country'])[0]);
+
+        $this->assertSame(1, Location::query()->where('user_id', 2)->count());
+        $this->assertSame('country', Location::find(2)->precision);
+    }
+
+    #[Test]
+    public function nobody_can_change_or_remove_another_members_place()
+    {
+        $this->fake();
+        $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city']);
+
+        $patch = $this->request('PATCH', '/api/member-map-locations/2', ['authenticatedAs' => 3, 'json' => ['data' => ['type' => 'member-map-locations', 'id' => '2', 'attributes' => ['profile' => false]]]]);
+        $this->assertSame(404, $this->send($patch)->getStatusCode());
+        $this->assertSame(404, $this->send($this->request('DELETE', '/api/member-map-locations/2', ['authenticatedAs' => 3]))->getStatusCode());
+        $this->assertTrue(Location::find(2)->show_on_profile);
+    }
+
+    #[Test]
+    public function a_lookup_under_a_second_after_the_last_is_refused_at_once_instead_of_waiting()
+    {
+        $geocoder = $this->fake();
+        $geocoder->throttled = true;
+
+        $this->assertSame(201, $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'city'])[0]);
+
+        $started = microtime(true);
+        [$status, $body] = $this->post(['lat' => 36.15, 'lng' => -86.78, 'precision' => 'region']);
+
+        $this->assertSame(429, $status);
+        $this->assertSame('member_map_busy', $body['errors'][0]['code']);
+        $this->assertLessThan(0.5, microtime(true) - $started, 'The request did not wait for its turn.');
+        $this->assertSame(1, $geocoder->calls);
     }
 }

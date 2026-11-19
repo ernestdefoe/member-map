@@ -10,8 +10,16 @@ class FakeGeocoder extends Geocoder
 {
     public int $calls = 0;
     public bool $down = false;
+    /** Go through the real one-a-second throttle, as production does. */
+    public bool $throttled = false;
 
     protected function fetch(string $endpoint, array $query): mixed
+    {
+        return $this->throttled ? $this->throttle(fn () => $this->answer($endpoint, $query)) : $this->answer($endpoint, $query);
+    }
+
+    /** @param array<string, scalar> $query */
+    private function answer(string $endpoint, array $query): mixed
     {
         $this->calls++;
         if ($this->down) {

@@ -2,8 +2,7 @@
 
 namespace ErnestDefoe\MemberMap\Api;
 
-use Flarum\Settings\SettingsRepositoryInterface;
-
+/** A point a member sent: checked before it is looked up, and never stored. */
 final class Point
 {
     /** @param array<string, mixed> $input */
@@ -17,11 +16,5 @@ final class Point
     public static function lng(float $lng): float
     {
         return fmod(fmod($lng + 180, 360) + 360, 360) - 180;
-    }
-
-    /** Saved names are in the forum's language, so every reader sees the same label. */
-    public static function locale(SettingsRepositoryInterface $settings): string
-    {
-        return (string) ($settings->get('default_locale') ?: 'en');
     }
 }

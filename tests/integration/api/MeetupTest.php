@@ -34,9 +34,9 @@ class MeetupTest extends TestCase
     }
 
     /** @return array{int, array<string, mixed>|null} */
-    private function post(array $body): array
+    private function post(array $attributes): array
     {
-        $response = $this->send($this->request('POST', '/api/member-map/meetups', ['authenticatedAs' => 2, 'json' => $body]));
+        $response = $this->send($this->request('POST', '/api/member-map-meetups', ['authenticatedAs' => 2, 'json' => ['data' => ['type' => 'member-map-meetups', 'attributes' => $attributes]]]));
 
         return [$response->getStatusCode(), json_decode((string) $response->getBody(), true)];
     }
@@ -47,10 +47,12 @@ class MeetupTest extends TestCase
         $this->fake();
         $when = Carbon::now('America/Chicago')->addDays(10)->setTime(10, 0);
 
-        [$status, $body] = $this->post(['title' => 'Coffee in Nashville', 'details' => 'By the river.', 'lat' => 36.16, 'lng' => -86.78, 'startsAt' => $when->format('Y-m-d\TH:i'), 'timezone' => 'America/Chicago']);
+        [$status, $body] = $this->post(['title' => 'Coffee in Nashville', 'details' => 'By the river.', 'lat' => 36.16, 'lng' => -86.78, 'startsLocal' => $when->format('Y-m-d\TH:i'), 'browserTimezone' => 'America/Chicago']);
 
         $this->assertSame(201, $status, json_encode($body));
+        $this->assertSame('Coffee in Nashville', $body['data']['attributes']['title']);
         $meetup = Meetup::query()->firstOrFail();
+        $this->assertSame($meetup->discussion_id, $body['data']['attributes']['discussionId']);
         $this->assertSame('America/Chicago', $meetup->timezone);
         $this->assertSame($when->copy()->utc()->format('Y-m-d H:i'), $meetup->starts_at->format('Y-m-d H:i'));
 
@@ -68,8 +70,8 @@ class MeetupTest extends TestCase
     {
         $this->fake();
 
-        $this->assertSame(422, $this->post(['title' => 'Old', 'lat' => 36.16, 'lng' => -86.78, 'startsAt' => '2020-01-01T10:00'])[0]);
-        $this->assertSame(422, $this->post(['title' => 'x', 'lat' => 36.16, 'lng' => -86.78, 'startsAt' => Carbon::now()->addDay()->format('Y-m-d\TH:i')])[0]);
+        $this->assertSame(422, $this->post(['title' => 'Old', 'lat' => 36.16, 'lng' => -86.78, 'startsLocal' => '2020-01-01T10:00'])[0]);
+        $this->assertSame(422, $this->post(['title' => 'x', 'lat' => 36.16, 'lng' => -86.78, 'startsLocal' => Carbon::now()->addDay()->format('Y-m-d\TH:i')])[0]);
         $this->assertSame(0, Discussion::query()->count());
     }
 
@@ -77,11 +79,11 @@ class MeetupTest extends TestCase
     public function only_the_host_or_a_moderator_takes_the_pin_down()
     {
         $this->fake();
-        $this->post(['title' => 'Picnic', 'lat' => 36.16, 'lng' => -86.78, 'startsAt' => Carbon::now()->addDays(3)->format('Y-m-d\TH:i')]);
+        $this->post(['title' => 'Picnic', 'lat' => 36.16, 'lng' => -86.78, 'startsLocal' => Carbon::now()->addDays(3)->format('Y-m-d\TH:i')]);
         $id = Meetup::query()->value('id');
 
-        $this->assertSame(403, $this->send($this->request('DELETE', "/api/member-map/meetups/$id", ['authenticatedAs' => 3]))->getStatusCode());
-        $this->assertSame(204, $this->send($this->request('DELETE', "/api/member-map/meetups/$id", ['authenticatedAs' => 1]))->getStatusCode());
+        $this->assertSame(403, $this->send($this->request('DELETE', "/api/member-map-meetups/$id", ['authenticatedAs' => 3]))->getStatusCode());
+        $this->assertSame(204, $this->send($this->request('DELETE', "/api/member-map-meetups/$id", ['authenticatedAs' => 1]))->getStatusCode());
         $this->assertSame(0, Meetup::query()->count());
         $this->assertSame(1, Discussion::query()->count());
     }

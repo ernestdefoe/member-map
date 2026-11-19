@@ -12,6 +12,7 @@ use ErnestDefoe\MemberMap\Settings;
 use ErnestDefoe\MemberMap\Trip;
 use Flarum\Discussion\Discussion;
 use Flarum\Http\RequestUtil;
+use Flarum\Http\SlugDriverInterface;
 use Flarum\Http\SlugManager;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
@@ -29,9 +30,12 @@ use Psr\Http\Server\RequestHandlerInterface;
  *   meetups:  [[id, lat, lng, label, startsAt, timezone|null, title, discussionId, discussionSlug], ...]
  *   me:       the viewer's own place and trips, or null
  *
- * ONE query for the markers (MemberQuery). Names, slugs, avatars and online
- * state come from the loaded rows, so nothing is queried per member. Travelers
- * and meetups are one query each. Never served to crawlers.
+ * A plain handler, not a resource: up to 10,000 markers as positional rows
+ * are a fraction of the size of JSON:API documents, and only what the map
+ * draws ever leaves the server. ONE query for the markers (MemberQuery).
+ * Names, slugs, avatars and online state come from the loaded rows, so
+ * nothing is queried per member. Travelers and meetups are one query each.
+ * Never served to crawlers.
  */
 class MapController implements RequestHandlerInterface
 {
@@ -48,52 +52,10 @@ class MapController implements RequestHandlerInterface
     {
         $actor = RequestUtil::getActor($request);
         $actor->assertCan(Settings::VIEW);
+        Crawlers::refuse($request);
 
-        if (Crawlers::is($request)) {
-            return Errors::make(403, 'permission_denied');
-        }
-
-        $table = (new Location())->getTable();
         $slugs = $this->slugs->forResource(User::class);
-        $jitter = (bool) $this->settings->get(Settings::JITTER);
-        $seesLastSeen = $actor->hasPermission('user.viewLastSeenAt');
-        $online = Carbon::now()->subMinutes(5);
-        $new = Carbon::now()->subDays(self::NEW_DAYS);
-
-        $users = $this->members->listable($actor)
-            ->select('users.*', "$table.lat as mm_lat", "$table.lng as mm_lng", "$table.label as mm_label", "$table.precision as mm_precision", "$table.show_on_profile as mm_profile", "$table.country_code as mm_cc", "$table.timezone as mm_tz", "$table.members_only as mm_members_only", "$table.created_at as mm_created")
-            ->orderByDesc("$table.updated_at")
-            ->limit(MemberQuery::MAX)
-            ->get();
-
-        $members = [];
-        $me = null;
-
-        foreach ($users as $user) {
-            $lat = (float) $user->getAttribute('mm_lat');
-            $lng = (float) $user->getAttribute('mm_lng');
-            $precision = (string) $user->getAttribute('mm_precision');
-            $label = (string) $user->getAttribute('mm_label');
-
-            if ($user->id === $actor->id) {
-                $me = self::own($lat, $lng, $label, $precision, (bool) $user->getAttribute('mm_profile'), (bool) $user->getAttribute('mm_members_only'), true);
-            }
-
-            if ($jitter && $precision === Precision::CITY) {
-                [$lat, $lng] = Jitter::apply((int) $user->id, $lat, $lng);
-            }
-
-            $flags = 0;
-            if ($user->last_seen_at && $user->last_seen_at > $online && ($seesLastSeen || $user->getPreference('discloseOnline'))) {
-                $flags |= 1;
-            }
-            $created = $user->getAttribute('mm_created');
-            if ($created && Carbon::parse($created) > $new) {
-                $flags |= 2;
-            }
-
-            $members[] = [(int) $user->id, $lat, $lng, $user->display_name, $slugs->toSlug($user), $user->avatar_url, $user->getAttribute('mm_cc'), $user->getAttribute('mm_tz'), $label, $flags];
-        }
+        [$members, $me] = $this->markers($actor, $slugs);
 
         // Saved, but not shown (no longer allowed to be listed): still theirs to see and remove.
         if (! $me && ! $actor->isGuest() && ($own = Location::find($actor->id))) {
@@ -108,8 +70,61 @@ class MapController implements RequestHandlerInterface
         ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
+    /**
+     * Every marker, and the viewer's own place when they are among them.
+     *
+     * @return array{0: list<array<int, mixed>>, 1: array<string, mixed>|null}
+     */
+    private function markers(User $actor, SlugDriverInterface $slugs): array
+    {
+        $table = (new Location())->getTable();
+        $users = $this->members->listable($actor)
+            ->select('users.*', "$table.lat as mm_lat", "$table.lng as mm_lng", "$table.label as mm_label", "$table.precision as mm_precision", "$table.show_on_profile as mm_profile", "$table.country_code as mm_cc", "$table.timezone as mm_tz", "$table.members_only as mm_members_only", "$table.created_at as mm_created")
+            ->orderByDesc("$table.updated_at")
+            ->limit(MemberQuery::MAX)
+            ->get();
+
+        $jitter = (bool) $this->settings->get(Settings::JITTER);
+        $seesLastSeen = $actor->hasPermission('user.viewLastSeenAt');
+        $members = [];
+        $me = null;
+
+        foreach ($users as $user) {
+            $lat = (float) $user->getAttribute('mm_lat');
+            $lng = (float) $user->getAttribute('mm_lng');
+            $precision = (string) $user->getAttribute('mm_precision');
+            $label = (string) $user->getAttribute('mm_label');
+
+            if ($user->id === $actor->id) {
+                $me = self::own($lat, $lng, $label, $precision, (bool) $user->getAttribute('mm_profile'), (bool) $user->getAttribute('mm_members_only'), true);
+            }
+            if ($jitter && $precision === Precision::CITY) {
+                [$lat, $lng] = Jitter::apply((int) $user->id, $lat, $lng);
+            }
+
+            $members[] = [(int) $user->id, $lat, $lng, $user->display_name, $slugs->toSlug($user), $user->avatar_url, $user->getAttribute('mm_cc'), $user->getAttribute('mm_tz'), $label, self::flags($user, $seesLastSeen)];
+        }
+
+        return [$members, $me];
+    }
+
+    /** 1 = online now (when the viewer may know it), 2 = joined the map in the last few days (drops in). */
+    private static function flags(User $user, bool $seesLastSeen): int
+    {
+        $flags = 0;
+        if ($user->last_seen_at && $user->last_seen_at > Carbon::now()->subMinutes(5) && ($seesLastSeen || $user->getPreference('discloseOnline'))) {
+            $flags |= 1;
+        }
+        $created = $user->getAttribute('mm_created');
+        if ($created && Carbon::parse($created) > Carbon::now()->subDays(self::NEW_DAYS)) {
+            $flags |= 2;
+        }
+
+        return $flags;
+    }
+
     /** @return list<array<int, mixed>> */
-    private function trips(User $actor, \Flarum\Http\SlugDriverInterface $slugs): array
+    private function trips(User $actor, SlugDriverInterface $slugs): array
     {
         $table = (new Trip())->getTable();
 

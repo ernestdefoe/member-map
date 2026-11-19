@@ -31,7 +31,8 @@
     ],
     "require": {
         "php": "^8.3",
-        "flarum/core": "^2.0"
+        "flarum/core": "^2.0",
+        "guzzlehttp/guzzle": "^7.0"
     },
     "autoload": {
         "psr-4": {
@@ -53,15 +54,33 @@
                 "color": "#fff"
             },
             "optional-dependencies": [
+                "ernestdefoe/bespoke",
+                "ernestdefoe/calendar",
+                "ernestdefoe/page-builder",
                 "flarum/gdpr",
-                "flarum/suspend"
+                "flarum/suspend",
+                "flarum/tags",
+                "fof/forum-widgets-core",
+                "ianm/follow-users"
             ]
         }
     },
     "require-dev": {
         "flarum/gdpr": "^2.0",
         "flarum/phpstan": "^2.0",
-        "flarum/testing": "^2.0"
+        "flarum/testing": "^2.0",
+        "flarum/tags": "^2.0",
+        "flarum/suspend": "^2.0"
+    },
+    "suggest": {
+        "flarum/tags": "Meetup discussions start in a tag you choose.",
+        "flarum/suspend": "Suspended members leave the map while suspended.",
+        "flarum/gdpr": "Places and trips are part of a member's data export and erasure.",
+        "ianm/follow-users": "Adds the People I follow filter.",
+        "ernestdefoe/calendar": "Meetups also go on the calendar.",
+        "ernestdefoe/page-builder": "Adds the Where we are block.",
+        "ernestdefoe/bespoke": "Adds the Where we are widget.",
+        "fof/forum-widgets-core": "Adds the Where we are widget."
     },
     "scripts": {
         "test": [

@@ -17,22 +17,31 @@ use Throwable;
  *
  * Nominatim's usage policy, and how it is met:
  *  - at most one request a second, from the whole forum: a cache lock plus a
- *    timestamp spaces every call (throttle());
+ *    timestamp space every call (throttle()). A call that would come too soon
+ *    is refused at once (GeocoderBusy, "try again in a moment"), and the
+ *    browser asks again a second later: no PHP worker ever waits for a turn;
  *  - an identifying User-Agent naming the forum;
  *  - results cached: every answer is kept 30 days in member_map_geocode;
  *  - no search-as-you-type: the browser only searches when asked to.
  * Nothing here is ever called while rendering a page: only when a member
- * searches for, or saves, their own location.
+ * searches for, or saves, their own location. That lookup stays in the
+ * request on purpose: the member is waiting for the answer (a list of places,
+ * or the place their pin is in), every answer is cached, and the request is
+ * capped at 6 seconds. Old answers are pruned by the member-map:prune command.
  */
 class Geocoder
 {
-    private const KEEP_DAYS = 30;
+    public const KEEP_DAYS = 30;
+
+    /** Seconds between two calls to the geocoder, from the whole forum. */
+    private const SPACING = 1.05;
 
     public function __construct(
         protected SettingsRepositoryInterface $settings,
         protected UrlGenerator $url,
         protected ConnectionInterface $db,
         protected Cache $cache,
+        protected Client $http,
     ) {
     }
 
@@ -146,7 +155,7 @@ class Geocoder
     }
 
     /**
-     * One HTTP request to the geocoder, spaced at least a second from the last.
+     * One HTTP request to the geocoder, at least a second after the last.
      *
      * Protected so tests can answer without the network.
      *
@@ -154,7 +163,7 @@ class Geocoder
      */
     protected function fetch(string $endpoint, array $query): mixed
     {
-        $base = rtrim(trim((string) $this->settings->get(Settings::GEOCODER)) ?: Settings::DEFAULT_GEOCODER, '/');
+        $base = rtrim(trim((string) $this->settings->get(Settings::GEOCODER)), '/');
 
         $query['format'] = 'jsonv2';
         if ($email = trim((string) $this->settings->get(Settings::GEOCODER_EMAIL))) {
@@ -165,8 +174,10 @@ class Geocoder
         }
 
         return $this->throttle(function () use ($base, $endpoint, $query) {
-            $response = (new Client(['timeout' => 6, 'connect_timeout' => 3]))->get("$base/$endpoint", [
+            $response = $this->http->get("$base/$endpoint", [
                 'query' => $query,
+                'timeout' => 6,
+                'connect_timeout' => 3,
                 'headers' => [
                     'User-Agent' => 'Flarum Member Map (+'.$this->url->to('forum')->base().')',
                     'Accept' => 'application/json',
@@ -178,39 +189,42 @@ class Geocoder
         });
     }
 
-    private function throttle(callable $request): mixed
+    protected function throttle(callable $request): mixed
     {
         if ($this->cache->get('member-map:geocoder:down')) {
             throw new GeocoderUnavailable('Geocoder failed recently.');
         }
 
-        $run = function () use ($request) {
-            $wait = (float) $this->cache->get('member-map:geocoder:last', 0) + 1.05 - microtime(true);
-            if ($wait > 0) {
-                usleep((int) ceil(min($wait, 1.05) * 1_000_000));
-            }
-
-            try {
-                return $request();
-            } catch (Throwable $e) {
-                // Don't hammer a provider that is down: everyone waits half a minute.
-                $this->cache->put('member-map:geocoder:down', true, 30);
-
-                throw new GeocoderUnavailable('Geocoder request failed.', 0, $e);
-            } finally {
-                $this->cache->put('member-map:geocoder:last', sprintf('%.4f', microtime(true)), 60);
-            }
-        };
-
         $store = $this->cache->getStore();
-        if (! $store instanceof LockProvider) {
-            return $run();
+        $lock = $store instanceof LockProvider ? $store->lock('member-map:geocoder', 10) : null;
+
+        // Another member's lookup is running: refuse now rather than hold this worker until it ends.
+        if ($lock && ! $lock->get()) {
+            throw new GeocoderBusy('Geocoder busy.');
         }
 
         try {
-            return $store->lock('member-map:geocoder', 10)->block(4, $run);
-        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
-            throw new GeocoderUnavailable('Geocoder busy.');
+            return $this->spaced($request);
+        } finally {
+            $lock?->release();
+        }
+    }
+
+    private function spaced(callable $request): mixed
+    {
+        if ((float) $this->cache->get('member-map:geocoder:last', 0) + self::SPACING > microtime(true)) {
+            throw new GeocoderBusy('Geocoder called less than a second ago.');
+        }
+
+        try {
+            return $request();
+        } catch (Throwable $e) {
+            // Don't hammer a provider that is down: everyone waits half a minute.
+            $this->cache->put('member-map:geocoder:down', true, 30);
+
+            throw new GeocoderUnavailable('Geocoder request failed.', 0, $e);
+        } finally {
+            $this->cache->put('member-map:geocoder:last', sprintf('%.4f', microtime(true)), 60);
         }
     }
 
@@ -231,11 +245,6 @@ class Geocoder
         $result = $fetch();
 
         $table->clone()->upsert([['key' => $key, 'result' => json_encode($result), 'created_at' => Carbon::now()]], ['key'], ['result', 'created_at']);
-
-        // Prune now and then rather than on a schedule many forums never run.
-        if (random_int(1, 50) === 1) {
-            $table->clone()->where('created_at', '<', Carbon::now()->subDays(self::KEEP_DAYS))->delete();
-        }
 
         return $result;
     }

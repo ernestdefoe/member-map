@@ -16,7 +16,8 @@ use Psr\Http\Server\RequestHandlerInterface;
  * GET /api/member-map/stats  ->  {members, countries: [[code, count], ...]}
  *
  * For the "Where we are" widget, which sits on pages that aren't the map:
- * counts only, no names or places. One grouped query, cached ten minutes
+ * counts only, no names or places. A plain handler, not a resource: it is an
+ * aggregate with no records behind it. One grouped query, cached ten minutes
  * (one entry for guests, one for members: guests don't count members-only).
  */
 class StatsController implements RequestHandlerInterface
@@ -32,9 +33,7 @@ class StatsController implements RequestHandlerInterface
         $actor = RequestUtil::getActor($request);
         $actor->assertCan(Settings::VIEW);
 
-        if (Crawlers::is($request)) {
-            return Errors::make(403, 'permission_denied');
-        }
+        Crawlers::refuse($request);
 
         $table = (new Location())->getTable();
         $key = 'member-map:stats:'.($actor->isGuest() ? 'guest' : 'member');
@@ -42,6 +41,7 @@ class StatsController implements RequestHandlerInterface
         $stats = $this->cache->remember($key, 600, function () use ($actor, $table) {
             $rows = $this->members->listable($actor)
                 ->toBase()
+                // An aggregate beside a grouped column: the builder has no method for count() in a select list.
                 ->selectRaw('count(*) as aggregate')
                 ->addSelect("$table.country_code")
                 ->groupBy("$table.country_code")

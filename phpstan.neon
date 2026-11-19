@@ -11,6 +11,14 @@ parameters:
     paths:
         - extend.php
         - src
+    ignoreErrors:
+        # Page Builder is a private package: its extender is only built when it is enabled (Extend\Conditional).
+        -
+            identifier: class.notFound
+            message: '#Ernestdefoe\\PageBuilder\\Extend\\PageBuilderBlock#'
+            path: extend.php
     excludePaths:
         # Implements Page Builder's interface; loaded only when Page Builder is installed.
         - src/Widget/WhereWeAreBlock.php
+        # Uses Calendar's model; registered only when Calendar is enabled (Extend\Conditional).
+        - src/Integrations/AddMeetupToCalendar.php
