@@ -262,9 +262,10 @@ class MapTest extends TestCase
         $this->grant();
         $rows = [];
         for ($id = 10; $id < 30; $id++) {
-            $rows[] = ['id' => $id, 'username' => "member$id", 'email' => "member$id@machine.local", 'is_email_confirmed' => 1];
+            $rows[] = ['id' => $id, 'username' => "member$id", 'email' => "member$id@machine.local", 'is_email_confirmed' => 1, 'password' => '', 'joined_at' => Carbon::now()];
         }
-        $this->prepareDatabase([User::class => $rows]);
+        // Inserted directly: the app has booted (grant()), so prepareDatabase() would no longer apply.
+        $this->database()->table('users')->insert($rows);
         $this->database()->table('member_map_locations')->insert(array_map(fn ($row) => ['user_id' => $row['id'], 'lat' => 1, 'lng' => 1, 'precision' => 'city', 'label' => 'Somewhere', 'show_on_profile' => 1, 'updated_at' => Carbon::now()], $rows));
 
         $queries = 0;
@@ -282,5 +283,6 @@ class MapTest extends TestCase
         // One for every listed user's line, plus the viewer's own place (they are first in the list).
         $this->assertSame(2, $count(1));
         $this->assertSame(2, $count(20));
+        $this->assertGreaterThanOrEqual(20, $this->database()->table('users')->count());
     }
 }
