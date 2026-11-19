@@ -3,9 +3,7 @@ import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import extractText from 'flarum/common/utils/extractText';
 import type Mithril from 'mithril';
-import { call, t, type SearchResult } from '../api';
-
-declare const m: Mithril.Static;
+import { call, shown, t, type SearchResult } from '../api';
 
 /**
  * Search for a place, on the button or Enter only: Nominatim's usage policy
@@ -72,9 +70,9 @@ export default class PlaceSearch extends Component<{ id: string; label: Mithril.
     const q = this.query().trim();
     if (q.length < 2 || this.searching) return;
     this.searching = true;
-    call<{ places: SearchResult[] }>('GET', '/geocode', { q })
+    call<{ places: SearchResult[] }>('/geocode', { q })
       .then((data) => (this.results = data.places))
-      .catch(() => {})
+      .catch(shown)
       .finally(() => {
         this.searching = false;
         m.redraw();

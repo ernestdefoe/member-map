@@ -118,15 +118,16 @@ export interface MapHandle {
   destroy: () => void;
 }
 
-export function createMap(container: HTMLElement, options: MapOptions = {}): MapHandle {
-  ensureCss();
+/** Which style is showing: dark or light, vector or the raster fallback. */
+interface StyleState {
+  dark: boolean;
+  raster: boolean;
+}
 
-  let dark = isDark();
-  let raster = !styleUrl(dark);
-
+function newMap(container: HTMLElement, options: MapOptions, state: StyleState): maplibregl.Map {
   const map = new maplibregl.Map({
     container,
-    style: raster ? rasterStyle() : (styleUrl(dark) as string),
+    style: state.raster ? rasterStyle() : (styleUrl(state.dark) as string),
     center: options.center ?? [0, 20],
     zoom: options.zoom ?? 1.4,
     minZoom: 0.5,
@@ -145,8 +146,6 @@ export function createMap(container: HTMLElement, options: MapOptions = {}): Map
   map.keyboard.disableRotation();
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-  container.classList.toggle('MemberMap--rasterDark', raster && dark);
-
   // MapLibre opens its compact credit expanded; on a phone that covers the map's foot, links and all.
   map.once('load', () => container.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
 
@@ -156,36 +155,59 @@ export function createMap(container: HTMLElement, options: MapOptions = {}): Map
     options.onStyle?.(map);
   });
 
-  // The vector style or its tiles are unreachable (anything failing before the
-  // first full load, or repeated tile failures after): draw the raster tiles instead.
+  return map;
+}
+
+/**
+ * The vector style or its tiles are unreachable (anything failing before the
+ * first full load, or repeated tile failures after): draw the raster tiles instead.
+ */
+function fallBackToRaster(map: maplibregl.Map, container: HTMLElement, state: StyleState): void {
   let loaded = false;
   let failures = 0;
   map.once('load', () => (loaded = true));
   map.on('error', () => {
-    if (raster || (loaded && ++failures < 4)) return;
-    raster = true;
-    container.classList.toggle('MemberMap--rasterDark', dark);
+    if (state.raster || (loaded && ++failures < 4)) return;
+    state.raster = true;
+    container.classList.toggle('MemberMap--rasterDark', state.dark);
     map.setStyle(rasterStyle());
   });
+}
 
-  // Follow the forum's light and dark mode as it changes.
+/** Follows the forum's light and dark mode as it changes; returns the function that stops following. */
+function followTheme(map: maplibregl.Map, container: HTMLElement, state: StyleState): () => void {
   const follow = () => {
     const now = isDark();
-    if (now === dark) return;
-    dark = now;
-    container.classList.toggle('MemberMap--rasterDark', raster && dark);
-    if (!raster && styleUrl(dark) !== styleUrl(!dark)) map.setStyle(styleUrl(dark) as string);
+    if (now === state.dark) return;
+    state.dark = now;
+    container.classList.toggle('MemberMap--rasterDark', state.raster && state.dark);
+    if (!state.raster && styleUrl(state.dark) !== styleUrl(!state.dark)) map.setStyle(styleUrl(state.dark) as string);
   };
   const observer = new MutationObserver(follow);
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   media.addEventListener('change', follow);
 
+  return () => {
+    observer.disconnect();
+    media.removeEventListener('change', follow);
+  };
+}
+
+export function createMap(container: HTMLElement, options: MapOptions = {}): MapHandle {
+  ensureCss();
+
+  const dark = isDark();
+  const state: StyleState = { dark, raster: !styleUrl(dark) };
+  const map = newMap(container, options, state);
+  container.classList.toggle('MemberMap--rasterDark', state.raster && state.dark);
+  fallBackToRaster(map, container, state);
+  const unfollow = followTheme(map, container, state);
+
   return {
     map,
     destroy: () => {
-      observer.disconnect();
-      media.removeEventListener('change', follow);
+      unfollow();
       map.remove();
     },
   };

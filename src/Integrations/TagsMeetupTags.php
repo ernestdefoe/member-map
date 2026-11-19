@@ -17,7 +17,8 @@ class TagsMeetupTags extends MeetupTags
 
     public function pick(User $actor): array
     {
-        $id = (int) $this->settings->get(Settings::MEETUP_TAG);
+        // Saved as "t5" by the admin select (older installs: "5").
+        $id = (int) ltrim((string) $this->settings->get(Settings::MEETUP_TAG), 't');
         $tag = $id ? Tag::whereVisibleTo($actor)->find($id) : null;
 
         if (! $tag) {

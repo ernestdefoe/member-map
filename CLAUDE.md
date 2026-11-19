@@ -7,8 +7,13 @@
 ## Design rules that exist for a reason
 
 - **Privacy is enforced on the server.** A saved location is the centre of the named place (city, region or country) around the point the member chose, looked up by `Geocoder::place()` and rounded (`Precision::decimals`). The raw point is never stored or returned. Never add a path that saves client coordinates directly.
-- **Nominatim's usage policy**: max one request a second for the whole forum (cache lock + timestamp in `Geocoder::throttle`), an identifying User-Agent, every answer cached 30 days in `member_map_geocode` (pruned on write, not by the file cache, which never deletes expired keys), and **no search-as-you-type**: the form searches only on the button or Enter.
+- **Nominatim's usage policy**: max one request a second for the whole forum (cache lock + timestamp in `Geocoder::throttle`), an identifying User-Agent, every answer cached 30 days in `member_map_geocode` (pruned daily by `member-map:prune`, not by the file cache, which never deletes expired keys), and **no search-as-you-type**: the form searches only on the button or Enter.
+- 🚨 The throttle NEVER waits: a lookup that would come under a second after the last (or while another runs) is refused at once as `member_map_busy` (429), and `api.ts` asks again a second later. No `usleep`, no `lock->block()`: both hold a PHP worker (Floxum charged it on 1.0.1).
 - Geocoding happens only when a member searches or saves. Never call it while rendering a page.
+- **API shape**: places, trips and meetups are JSON:API resources (`member-map-locations` keyed by user id, `member-map-trips`, `member-map-meetups`), validated in their `creating()` hooks with `Api\Problem` (a KnownError whose type is the error `code`; its status is listed in extend.php's ErrorHandling). Only four read-only plain handlers stay, each saying why: the map's lean rows (`MapController`), the place lookup, filter ids, the widget's counts. Don't add more.
+- **Optional extensions** (Suspend, Follow Users, Tags, Calendar, Page Builder, GDPR) are wired ONLY in extend.php's `Extend\Conditional`: a default class in `src/Integrations` that does nothing, swapped by `Extend\Binding` for the version that uses the other extension (or a listener on `MeetupPlanned` for Calendar). No `isEnabled()`/`class_exists()` in `src/`. Every one is in composer.json's optional-dependencies and suggest.
+- extend.php uses string setting keys, never `Settings::` constants (it is read on every boot, also mid-deploy). Emptied tile/credit/geocoder addresses are deleted on save (`ForgetClearedSettings`) so `->default()` applies; nothing reads them with a fallback.
+- Trip alerts go out from a queued job (`NotifyNearbyMembers`), never the request.
 - The map endpoint is ONE query (`MemberQuery`): visibility, confirmed email, the `member-map.list` permission (checked in SQL via group_permission/group_user, so losing it takes someone off the map at once) and suspension.
 - `memberMapLocation` / `memberMapOwn` on the user resource are deferred values batched per request (`Api\UserFields`): one query for every user on the page. Keep state keyed by the request in the WeakMap.
 - The map engine is MapLibre GL 6 (OpenFreeMap vector styles; raster tiles as the fallback), the `forum/map/engine` chunk, imported dynamically. A STATIC import of it from two chunks makes webpack emit a numbered root chunk that `jsDirectory` does not publish (404). MapLibre 5.x has a critical sanitizer advisory: stay on 6.
@@ -25,4 +30,5 @@
 ## Testing
 
 - `composer test:setup && composer test` (integration), `composer analyse:phpstan`.
-- `cd js && npm ci && npm run build && npm run format-check`.
+- `cd js && npm ci && npm run build && npm run format-check && npm run check-typings`.
+- JS entries are `js/forum.ts` / `js/admin.ts` (`export * from`), declarative extenders in `js/src/<frontend>/extend.ts`. The map page's parts live in `components/mapPage/` and are imported ONLY from MapPage (any other importer splits them into a numbered chunk). Functions stay under 50 lines; `.catch(shown)` after `call()`/`save()`, never an empty catch or `console.*`.

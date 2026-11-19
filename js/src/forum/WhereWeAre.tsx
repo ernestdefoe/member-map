@@ -6,12 +6,10 @@ import { fof, hasFofWidgets, placed } from '../common/fofWidgets';
 
 /**
  * "Where we are": how many members are on the map, in how many countries,
- * the top few, and a way in. Counts only, from /api/member-map/stats (one
+ * the top few, and a way in. Counts only, from /api/member-map-stats/map (one
  * grouped query, cached ten minutes on the server), fetched once per page
  * load and shared by every place the widget is shown.
  */
-
-declare const m: Mithril.Static;
 
 const EXT = 'ernestdefoe-member-map';
 const KEY = 'whereWeAre';
@@ -21,13 +19,20 @@ function load() {
   if (store.stats || store.loading || !app.forum.attribute('memberMapCanView')) return;
   store.loading = true;
   app
-    .request<any>({ method: 'GET', url: app.forum.attribute('apiUrl') + '/member-map/stats' })
-    .then((stats) => (store.stats = stats))
-    .catch(() => {})
+    .request<any>({ method: 'GET', url: app.forum.attribute('apiUrl') + '/member-map-stats/map', errorHandler: stayHidden })
+    .then((document) => (store.stats = document.data.attributes))
     .finally(() => {
       store.loading = false;
       m.redraw();
     });
+}
+
+/**
+ * The widget sits on pages that aren't the map: if its counts can't load it
+ * just doesn't show, rather than raise an alert about something nobody asked for.
+ */
+function stayHidden(): void {
+  store.stats = null;
 }
 
 export function hasContent(): boolean {
@@ -61,55 +66,60 @@ export const WhereWeAre: Mithril.Component<{ heading?: boolean }> = {
 
 /** Offer the widget to every host that is installed: Bespoke, Page Builder, fof/forum-widgets-core. */
 export function registerWidgetHosts(): void {
+  const extensions = (globalThis as any).flarum?.extensions || {};
+
+  if ('ernestdefoe-bespoke' in extensions) addToBespoke();
+  if ('ernestdefoe-page-builder' in extensions) addToPageBuilder();
+  if (hasFofWidgets()) addToFofWidgets();
+}
+
+function addToBespoke(): void {
   const g = globalThis as any;
-  const extensions = g.flarum?.extensions || {};
+  g.BespokeWidgetQueue = g.BespokeWidgetQueue || [];
+  g.BespokeWidgetQueue.push({
+    type: 'member-map-where-we-are',
+    label: `${EXT}.forum.widget.title`,
+    icon: 'fas fa-earth-americas',
+    zones: ['sidebar', 'above-list', 'below-list', 'footer'],
+    schema: [],
+    component: { view: () => m(WhereWeAre) },
+  });
+}
 
-  if ('ernestdefoe-bespoke' in extensions) {
-    g.BespokeWidgetQueue = g.BespokeWidgetQueue || [];
-    g.BespokeWidgetQueue.push({
-      type: 'member-map-where-we-are',
-      label: `${EXT}.forum.widget.title`,
-      icon: 'fas fa-earth-americas',
-      zones: ['sidebar', 'above-list', 'below-list', 'footer'],
-      schema: [],
-      component: { view: () => m(WhereWeAre) },
-    });
-  }
+function addToPageBuilder(): void {
+  const g = globalThis as any;
+  g.PageBuilderBlockQueue = g.PageBuilderBlockQueue || [];
+  g.PageBuilderBlockQueue.push({ type: 'member-map-where-we-are', component: { view: () => m(WhereWeAre) } });
+}
 
-  if ('ernestdefoe-page-builder' in extensions) {
-    g.PageBuilderBlockQueue = g.PageBuilderBlockQueue || [];
-    g.PageBuilderBlockQueue.push({ type: 'member-map-where-we-are', component: { view: () => m(WhereWeAre) } });
-  }
+function addToFofWidgets(): void {
+  const Widgets = fof('common/extend/Widgets');
+  const WidgetBase = fof('common/components/Widget');
+  if (!Widgets || !WidgetBase || !(app as any).widgets) return;
 
-  if (hasFofWidgets()) {
-    const Widgets = fof('common/extend/Widgets');
-    const WidgetBase = fof('common/components/Widget');
-    if (!Widgets || !WidgetBase || !(app as any).widgets) return;
-
-    class WhereWeAreWidget extends WidgetBase {
-      className() {
-        return 'MemberMapFofWidget';
-      }
-      icon() {
-        return 'fas fa-earth-americas';
-      }
-      title() {
-        return t('widget.title');
-      }
-      content() {
-        return m(WhereWeAre, { heading: false });
-      }
+  class WhereWeAreWidget extends WidgetBase {
+    className() {
+      return 'MemberMapFofWidget';
     }
-
-    new Widgets()
-      .add({
-        key: KEY,
-        component: WhereWeAreWidget,
-        isDisabled: () => !placed(app, EXT, KEY) || !hasContent(),
-        isUnique: true,
-        placement: 'end',
-        position: 1,
-      })
-      .extend(app, EXT);
+    icon() {
+      return 'fas fa-earth-americas';
+    }
+    title() {
+      return t('widget.title');
+    }
+    content() {
+      return m(WhereWeAre, { heading: false });
+    }
   }
+
+  new Widgets()
+    .add({
+      key: KEY,
+      component: WhereWeAreWidget,
+      isDisabled: () => !placed(app, EXT, KEY) || !hasContent(),
+      isUnique: true,
+      placement: 'end',
+      position: 1,
+    })
+    .extend(app, EXT);
 }

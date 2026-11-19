@@ -3,7 +3,7 @@ import FormModal, { type IFormModalAttrs } from 'flarum/common/components/FormMo
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import type Mithril from 'mithril';
-import { browserZone, call, t, type SearchResult } from '../api';
+import { browserZone, save, shown, t, type SearchResult } from '../api';
 import PlaceSearch from './PlaceSearch';
 
 /**
@@ -11,8 +11,6 @@ import PlaceSearch from './PlaceSearch';
  * words. It starts a discussion to talk it through, shows as a pin, and goes
  * on the calendar when the Calendar extension is installed.
  */
-
-declare const m: Mithril.Static;
 
 const tm = (key: string, params: Record<string, any> = {}) => t(`meetup.${key}`, params);
 
@@ -45,7 +43,7 @@ export default class MeetupModal extends FormModal<IFormModalAttrs & { onsave?: 
               required
             />
           </div>
-          <PlaceSearch id="member-map-meetup-place" label={tm('where')} onpick={(place) => (this.place = place)} />
+          <PlaceSearch id="member-map-meetup-place" label={tm('where')} onpick={(place: SearchResult) => (this.place = place)} />
           <div className="Form-group">
             <label for="member-map-meetup-when">{tm('when')}</label>
             <input id="member-map-meetup-when" className="FormControl" type="datetime-local" bidi={this.when} required />
@@ -81,21 +79,21 @@ export default class MeetupModal extends FormModal<IFormModalAttrs & { onsave?: 
     e.preventDefault();
     if (!this.place) return;
     this.loading = true;
-    call<{ meetup: any[] }>('POST', '/meetups', {
+    save<{ discussionId: number; discussionSlug: string }>('POST', 'member-map-meetups', null, {
       title: this.name().trim(),
       details: this.details().trim(),
       lat: this.place.lat,
       lng: this.place.lng,
-      startsAt: this.when().slice(0, 16),
-      timezone: browserZone(),
+      startsLocal: this.when().slice(0, 16),
+      browserTimezone: browserZone(),
     })
-      .then(({ meetup }) => {
+      .then(({ data }) => {
         app.alerts.show({ type: 'success' }, tm('saved'));
         this.attrs.onsave?.();
         this.hide();
-        m.route.set(app.route('discussion', { id: `${meetup[7]}-${meetup[8]}` }));
+        m.route.set(app.route('discussion', { id: `${data.attributes.discussionId}-${data.attributes.discussionSlug}` }));
       })
-      .catch(() => {})
+      .catch(shown)
       .finally(() => {
         this.loading = false;
         m.redraw();

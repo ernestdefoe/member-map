@@ -7,9 +7,9 @@
  * (a city, a region or a country) chosen by them and looked up on the SERVER
  * (Geocoder::place); the point they searched or tapped is thrown away.
  *
- * Places, trips and meetups are JSON:API resources. Four read-only plain
- * handlers serve what has no record behind it: the map's lean marker rows,
- * the place lookup, filter ids and the widget's counts (each says why).
+ * Places, trips, meetups and the widget's counts are JSON:API resources.
+ * Two read-only plain handlers serve what has no record behind it: the map's
+ * lean marker rows and the place lookup (each says why).
  *
  * The map engine and the map page are lazy chunks: a forum page that is not
  * the map loads none of it.
@@ -47,13 +47,12 @@ return [
 
     (new Extend\Routes('api'))
         ->get('/member-map', 'member-map.index', Api\MapController::class)
-        ->get('/member-map/geocode', 'member-map.geocode', Api\GeocodeController::class)
-        ->get('/member-map/filter', 'member-map.filter', Api\FilterController::class)
-        ->get('/member-map/stats', 'member-map.stats', Api\StatsController::class),
+        ->get('/member-map/geocode', 'member-map.geocode', Api\GeocodeController::class),
 
     new Extend\ApiResource(Api\Resource\LocationResource::class),
     new Extend\ApiResource(Api\Resource\TripResource::class),
     new Extend\ApiResource(Api\Resource\MeetupResource::class),
+    new Extend\ApiResource(Api\Resource\StatsResource::class),
 
     (new Extend\ApiResource(UserResource::class))
         ->fields(Api\UserFields::class),

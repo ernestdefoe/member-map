@@ -6,3 +6,5 @@ composer.lock
 .phpunit.result.cache
 /tests/integration/tmp
 /js/coverage-ts
+/tests/integration/tmp-mysql
+/tests/integration/tmp-pgsql

@@ -3,6 +3,7 @@
 namespace ErnestDefoe\MemberMap\Api;
 
 use Carbon\Carbon;
+use ErnestDefoe\MemberMap\Integrations\Follows;
 use ErnestDefoe\MemberMap\Jitter;
 use ErnestDefoe\MemberMap\Location;
 use ErnestDefoe\MemberMap\MemberQuery;
@@ -11,11 +12,13 @@ use ErnestDefoe\MemberMap\Precision;
 use ErnestDefoe\MemberMap\Settings;
 use ErnestDefoe\MemberMap\Trip;
 use Flarum\Discussion\Discussion;
+use Flarum\Group\Group;
 use Flarum\Http\RequestUtil;
 use Flarum\Http\SlugDriverInterface;
 use Flarum\Http\SlugManager;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
+use Illuminate\Database\Eloquent\Builder;
 use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -29,6 +32,9 @@ use Psr\Http\Server\RequestHandlerInterface;
  *   trips:    [[userId, lat, lng, label, starts, ends, name, slug, avatar|null], ...]   (members only)
  *   meetups:  [[id, lat, lng, label, startsAt, timezone|null, title, discussionId, discussionSlug], ...]
  *   me:       the viewer's own place and trips, or null
+ *
+ * ?group=4 and/or ?following=1 narrow the members to that group's, or to the
+ * people the viewer follows (with Follow Users; nobody without it).
  *
  * A plain handler, not a resource: up to 10,000 markers as positional rows
  * are a fraction of the size of JSON:API documents, and only what the map
@@ -45,6 +51,7 @@ class MapController implements RequestHandlerInterface
         private readonly MemberQuery $members,
         private readonly SlugManager $slugs,
         private readonly SettingsRepositoryInterface $settings,
+        private readonly Follows $follows,
     ) {
     }
 
@@ -55,7 +62,7 @@ class MapController implements RequestHandlerInterface
         Crawlers::refuse($request);
 
         $slugs = $this->slugs->forResource(User::class);
-        [$members, $me] = $this->markers($actor, $slugs);
+        [$members, $me] = $this->markers($actor, $slugs, $request->getQueryParams());
 
         // Saved, but not shown (no longer allowed to be listed): still theirs to see and remove.
         if (! $me && ! $actor->isGuest() && ($own = Location::find($actor->id))) {
@@ -73,12 +80,13 @@ class MapController implements RequestHandlerInterface
     /**
      * Every marker, and the viewer's own place when they are among them.
      *
+     * @param array<string, mixed> $filters
      * @return array{0: list<array<int, mixed>>, 1: array<string, mixed>|null}
      */
-    private function markers(User $actor, SlugDriverInterface $slugs): array
+    private function markers(User $actor, SlugDriverInterface $slugs, array $filters): array
     {
         $table = (new Location())->getTable();
-        $users = $this->members->listable($actor)
+        $users = $this->narrow($this->members->listable($actor), $actor, $filters)
             ->select('users.*', "$table.lat as mm_lat", "$table.lng as mm_lng", "$table.label as mm_label", "$table.precision as mm_precision", "$table.show_on_profile as mm_profile", "$table.country_code as mm_cc", "$table.timezone as mm_tz", "$table.members_only as mm_members_only", "$table.created_at as mm_created")
             ->orderByDesc("$table.updated_at")
             ->limit(MemberQuery::MAX)
@@ -106,6 +114,24 @@ class MapController implements RequestHandlerInterface
         }
 
         return [$members, $me];
+    }
+
+    /**
+     * @param Builder<User> $query
+     * @param array<string, mixed> $filters
+     * @return Builder<User>
+     */
+    private function narrow(Builder $query, User $actor, array $filters): Builder
+    {
+        if (isset($filters['group'])) {
+            $group = is_numeric($filters['group']) ? Group::whereVisibleTo($actor)->find((int) $filters['group']) : null;
+            $query->whereIn('users.id', $group ? fn ($sub) => $sub->select('user_id')->from('group_user')->where('group_id', $group->id) : []);
+        }
+        if (! empty($filters['following'])) {
+            $query->whereIn('users.id', $actor->isGuest() ? [] : $this->follows->followedBy($actor));
+        }
+
+        return $query;
     }
 
     /** 1 = online now (when the viewer may know it), 2 = joined the map in the last few days (drops in). */

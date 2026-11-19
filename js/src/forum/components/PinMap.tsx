@@ -3,8 +3,6 @@ import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import type Mithril from 'mithril';
 import { t } from '../api';
 
-declare const m: Mithril.Static;
-
 /**
  * A small map to tap where you are. The pin is only ever sent to the server,
  * which saves the place around it, never the pin. The engine is its own
@@ -28,8 +26,8 @@ export default class PinMap extends Component<{
         await module.prepare();
         this.engine = module;
       })
-      .catch((error) => {
-        console.error('Member map:', error);
+      .catch(() => {
+        // The engine's chunk or its worker would not load: the form says to search instead.
         this.failed = true;
       })
       .finally(() => m.redraw());

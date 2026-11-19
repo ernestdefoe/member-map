@@ -180,22 +180,45 @@ class MapTest extends TestCase
         $this->database()->table('member_map_locations')->where('user_id', 3)->update(['country_code' => 'us']);
         $this->database()->table('member_map_locations')->where('user_id', 5)->update(['country_code' => 'de']);
 
-        [$status, $body] = $this->get('/api/member-map/stats');
+        [$status, $body] = $this->get('/api/member-map-stats/map');
 
-        $this->assertSame(200, $status);
-        $this->assertSame(2, $body['members']);
-        $this->assertEqualsCanonicalizing([['us', 1], ['de', 1]], $body['countries']);
+        $this->assertSame(200, $status, json_encode($body));
+        $this->assertSame(2, $body['data']['attributes']['members']);
+        $this->assertEqualsCanonicalizing([['us', 1], ['de', 1]], $body['data']['attributes']['countries']);
     }
 
     #[Test]
-    public function the_group_filter_answers_only_with_ids()
+    public function the_group_filter_narrows_the_markers_to_that_group()
     {
         $this->grant();
         $this->database()->table('group_user')->insert(['user_id' => 5, 'group_id' => Group::MODERATOR_ID]);
 
-        [, $body] = $this->get('/api/member-map/filter', 2, ['group' => (string) Group::MODERATOR_ID]);
+        [, $body] = $this->get('/api/member-map', 2, ['group' => (string) Group::MODERATOR_ID]);
+        $this->assertSame([5], array_column($body['members'], 0));
 
-        $this->assertSame(['ids' => [5]], $body);
+        // A group the viewer can't see, or no such group: nobody, not everybody.
+        [, $body] = $this->get('/api/member-map', 2, ['group' => '999']);
+        $this->assertSame([], $body['members']);
+    }
+
+    #[Test]
+    public function without_follow_users_the_following_filter_finds_nobody()
+    {
+        $this->grant();
+
+        [, $body] = $this->get('/api/member-map', 2, ['following' => '1']);
+
+        $this->assertSame([], $body['members']);
+    }
+
+    #[Test]
+    public function crawlers_never_get_the_counts_either()
+    {
+        $this->grant();
+
+        $response = $this->send($this->request('GET', '/api/member-map-stats/map', ['authenticatedAs' => 2])->withHeader('User-Agent', 'Googlebot/2.1'));
+
+        $this->assertSame(403, $response->getStatusCode());
     }
 
     #[Test]

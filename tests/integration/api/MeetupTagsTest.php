@@ -56,7 +56,7 @@ class MeetupTagsTest extends TestCase
     #[Test]
     public function a_restricted_meetup_tag_stays_restricted()
     {
-        $this->setting('ernestdefoe-member-map.meetup_tag', '2');
+        $this->setting('ernestdefoe-member-map.meetup_tag', 't2');
 
         [$status, $body] = $this->post();
 
@@ -68,7 +68,7 @@ class MeetupTagsTest extends TestCase
     #[Test]
     public function the_meetup_discussion_starts_in_the_meetup_tag()
     {
-        $this->setting('ernestdefoe-member-map.meetup_tag', '1');
+        $this->setting('ernestdefoe-member-map.meetup_tag', 't1');
 
         [$status, $body] = $this->post();
 

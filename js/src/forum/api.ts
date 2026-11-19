@@ -79,25 +79,61 @@ export const t = (key: string, params: Record<string, any> = {}) => app.translat
 
 /** The sentence for an error answer from our endpoints. */
 export function errorText(error: any): string {
-  const code = error?.response?.errors?.[0]?.code;
-  const key = `ernestdefoe-member-map.forum.errors.${code}`;
-  if (code && app.translator.trans(key) !== key) return extractText(app.translator.trans(key));
+  const first = error?.response?.errors?.[0];
+  const key = `ernestdefoe-member-map.forum.errors.${first?.code}`;
+  if (first?.code && app.translator.trans(key) !== key) return extractText(app.translator.trans(key));
+  if (first?.code === 'validation_error' && first.detail) return String(first.detail);
   if (error?.status === 0) return extractText(app.translator.trans('core.lib.error.network_message'));
   if (error?.status === 403) return extractText(app.translator.trans('core.lib.error.permission_denied_message'));
   return extractText(app.translator.trans('ernestdefoe-member-map.forum.page.load_error'));
 }
 
-export function call<T>(method: 'GET' | 'POST' | 'DELETE', path: string, data?: Record<string, any>): Promise<T> {
-  const url = app.forum.attribute<string>('apiUrl') + '/member-map' + path;
-  return app.request<T>({
-    method,
-    url: method === 'GET' && data ? url + '?' + new URLSearchParams(data).toString() : url,
-    body: method === 'GET' ? undefined : data,
-    errorHandler: (error: any) => {
+const isBusy = (error: any) => error?.response?.errors?.[0]?.code === 'member_map_busy';
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * One request, with the error shown to the member. The place search answers
+ * "busy" rather than keep a request waiting for its one-a-second turn: that
+ * answer is asked again, quietly, a second later (twice at most).
+ */
+function request<T>(options: { method: string; url: string; body?: any }, retries = 2): Promise<T> {
+  return app
+    .request<T>({
+      ...options,
+      errorHandler: (error: any) => {
+        throw error;
+      },
+    })
+    .catch((error) => {
+      if (retries > 0 && isBusy(error)) return wait(1100).then(() => request<T>(options, retries - 1));
       app.alerts.show({ type: 'error' }, errorText(error));
       throw error;
-    },
+    });
+}
+
+/** Our read-only endpoints under /api/member-map (the map, the place search, filters, stats). */
+export function call<T>(path: string, query?: Record<string, string>): Promise<T> {
+  const url = app.forum.attribute<string>('apiUrl') + '/member-map' + path;
+  return request<T>({ method: 'GET', url: query ? url + '?' + new URLSearchParams(query).toString() : url });
+}
+
+/** Our JSON:API resources: member-map-locations, member-map-trips and member-map-meetups. */
+export function save<T>(
+  method: 'POST' | 'PATCH' | 'DELETE',
+  type: string,
+  id: string | null,
+  attributes?: Record<string, any>
+): Promise<{ data: { id: string; attributes: T } }> {
+  return request({
+    method,
+    url: app.forum.attribute<string>('apiUrl') + '/' + type + (id ? '/' + id : ''),
+    body: method === 'DELETE' ? undefined : { data: { type, ...(id ? { id } : {}), attributes } },
   });
+}
+
+/** For .catch() after call() or save(): the member has already been shown the error. */
+export function shown(): void {
+  // request() alerted the member; the caller only resets its own state in .finally().
 }
 
 /** After saving or removing: the session user's own copy, so profile, card and settings update without a reload. */
@@ -117,7 +153,7 @@ export function openLocationForm(attrs: { onsave?: (place: Place | null) => void
 }
 
 export function removeLocation(): Promise<void> {
-  return call<void>('DELETE', '/location').then(() => {
+  return save('DELETE', 'member-map-locations', String(app.session.user!.id())).then(() => {
     remember(null);
     app.alerts.show({ type: 'success' }, t('location.removed'));
   });

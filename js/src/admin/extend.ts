@@ -4,10 +4,14 @@ import Extend from 'flarum/common/extenders';
 const t = (key: string) => app.translator.trans(`ernestdefoe-member-map.admin.${key}`, {}, true);
 const setting = (key: string) => `ernestdefoe-member-map.${key}`;
 
-/** Tags a meetup discussion can go in, when flarum/tags is on. */
+/**
+ * Tags a meetup discussion can go in, when flarum/tags is on. Keyed "t5", not
+ * "5": JavaScript orders number-like keys first, which would put "None" last.
+ * The server reads the number back (TagsMeetupTags).
+ */
 function tagOptions(): Record<string, string> {
   const options: Record<string, string> = { '': String(t('settings.meetup_tag_none')) };
-  for (const tag of app.store.all<any>('tags')) options[tag.id()] = tag.name();
+  for (const tag of app.store.all<any>('tags')) options['t' + tag.id()] = tag.name();
   return options;
 }
 
@@ -27,7 +31,6 @@ export default [
               setting: setting('meetup_tag'),
               type: 'select',
               options: tagOptions(),
-              default: '',
               label: t('settings.meetup_tag'),
               help: t('settings.meetup_tag_help'),
             }
