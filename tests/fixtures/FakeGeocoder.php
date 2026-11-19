@@ -13,9 +13,9 @@ class FakeGeocoder extends Geocoder
     /** Space lookups a second apart, as production does (off by default, so tests can look up quickly). */
     public bool $throttled = false;
 
-    protected function throttle(callable $request): mixed
+    protected function throttle(callable $request): ?array
     {
-        return $this->throttled ? parent::throttle($request) : $request();
+        return $this->throttled ? parent::throttle($request) : [$request()];
     }
 
     protected function fetch(string $endpoint, array $query): mixed

@@ -231,9 +231,11 @@ class LocationTest extends TestCase
         $this->assertSame(200, $first->getStatusCode());
         $this->assertSame('Nashville, Davidson County, Tennessee, United States', json_decode((string) $first->getBody(), true)['places'][0]['label']);
 
+        // Answers already looked up cost nothing; new lookups count, 15 a minute.
+        $this->assertSame(200, $search('Nashville')->getStatusCode());
         $statuses = [];
         for ($i = 0; $i < 15; $i++) {
-            $statuses[] = $search('Nashville')->getStatusCode();
+            $statuses[] = $search("Nashville $i")->getStatusCode();
         }
         $this->assertContains(429, $statuses);
     }

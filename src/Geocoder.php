@@ -5,6 +5,8 @@ namespace ErnestDefoe\MemberMap;
 use Carbon\Carbon;
 use Flarum\Http\UrlGenerator;
 use Flarum\Settings\SettingsRepositoryInterface;
+use Flarum\User\User;
+use ErnestDefoe\MemberMap\Api\RateLimit;
 use ErnestDefoe\MemberMap\Job\LookUpPlace;
 use GuzzleHttp\Client;
 use Illuminate\Contracts\Cache\LockProvider;
@@ -49,6 +51,7 @@ class Geocoder
         protected Client $http,
         protected Queue $queue,
         protected LoggerInterface $log,
+        protected RateLimit $limit,
     ) {
     }
 
@@ -57,9 +60,9 @@ class Geocoder
      *
      * @return list<array{label: string, lat: float, lng: float, bbox: list<float>|null}>
      */
-    public function search(string $query, string $locale): array
+    public function search(string $query, string $locale, ?User $for = null): array
     {
-        $results = $this->remember(['search', mb_strtolower($query), $locale], 'search', [
+        $results = $this->remember($for, ['search', mb_strtolower($query), $locale], 'search', [
             'q' => $query,
             'limit' => 6,
             'addressdetails' => 0,
@@ -90,13 +93,13 @@ class Geocoder
      *
      * @return array{lat: float, lng: float, label: string, country_code: string|null, region: string|null, timezone: string|null}|null null when there is no such place there (open sea)
      */
-    public function place(float $lat, float $lng, string $precision, string $locale): ?array
+    public function place(float $lat, float $lng, string $precision, string $locale, ?User $for = null): ?array
     {
         $lat = round($lat, 4);
         $lng = round($lng, 4);
         $zoom = Precision::zoom($precision);
 
-        $result = $this->remember(['reverse', $lat, $lng, $zoom, $locale], 'reverse', [
+        $result = $this->remember($for, ['reverse', $lat, $lng, $zoom, $locale], 'reverse', [
             'lat' => $lat,
             'lon' => $lng,
             'zoom' => $zoom,
@@ -171,11 +174,11 @@ class Geocoder
     public function lookUp(string $key, string $endpoint, array $query): void
     {
         try {
-            if (! $this->cached($key)) {
-                $this->store($key, $this->throttle(fn () => $this->fetch($endpoint, $query)));
+            // Not its turn (under a second since the last call): dropped, and the member's next ask queues it again.
+            $answer = $this->cached($key) ? null : $this->throttle(fn () => $this->fetch($endpoint, $query));
+            if ($answer) {
+                $this->store($key, $answer[0]);
             }
-        } catch (GeocoderBusy) {
-            // Under a second since the last call: the member's next ask queues it again.
         } catch (GeocoderUnavailable $e) {
             // Don't hammer a provider that is down: every lookup waits half a minute.
             $this->cache->put('member-map:geocoder:down', true, 30);
@@ -218,18 +221,20 @@ class Geocoder
         return json_decode((string) $response->getBody(), true);
     }
 
-    protected function throttle(callable $request): mixed
+    /**
+     * The provider's answer, wrapped, or null when it isn't this call's turn:
+     * the provider is resting after a failure, another lookup is running, or
+     * the last one was under a second ago. Never waits for a turn.
+     *
+     * @return array{0: mixed}|null
+     */
+    protected function throttle(callable $request): ?array
     {
-        if ($this->resting()) {
-            throw new GeocoderUnavailable('Geocoder failed recently.');
-        }
-
         $store = $this->cache->getStore();
         $lock = $store instanceof LockProvider ? $store->lock('member-map:geocoder', 10) : null;
 
-        // Another member's lookup is running: refuse now rather than hold this worker until it ends.
-        if ($lock && ! $lock->get()) {
-            throw new GeocoderBusy('Geocoder busy.');
+        if ($this->resting() || ($lock && ! $lock->get())) {
+            return null;
         }
 
         try {
@@ -239,14 +244,15 @@ class Geocoder
         }
     }
 
-    private function spaced(callable $request): mixed
+    /** @return array{0: mixed}|null */
+    private function spaced(callable $request): ?array
     {
         if ((float) $this->cache->get('member-map:geocoder:last', 0) + self::SPACING > microtime(true)) {
-            throw new GeocoderBusy('Geocoder called less than a second ago.');
+            return null;
         }
 
         try {
-            return $request();
+            return [$request()];
         } catch (Throwable $e) {
             throw new GeocoderUnavailable('Geocoder request failed.', 0, $e);
         } finally {
@@ -256,11 +262,13 @@ class Geocoder
 
     /**
      * The cached answer, or the lookup queued and "ask again in a moment".
+     * A queued lookup counts against the member's limits ($for); asking
+     * again while it waits does not.
      *
      * @param list<scalar> $parts what makes this lookup unique
      * @param array<string, scalar> $query
      */
-    private function remember(array $parts, string $endpoint, array $query): mixed
+    private function remember(?User $for, array $parts, string $endpoint, array $query): mixed
     {
         $key = hash('sha256', json_encode([...$parts, (string) $this->settings->get(Settings::GEOCODER)]) ?: $endpoint);
 
@@ -271,6 +279,9 @@ class Geocoder
             throw new GeocoderUnavailable('Geocoder failed recently.');
         }
         if ($this->cache->add('member-map:geocoder:queued:'.$key, true, 30)) {
+            if ($for) {
+                $this->limit->countLookup($for);
+            }
             $this->queue->push(new LookUpPlace($key, $endpoint, $query));
         }
 

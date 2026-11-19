@@ -153,4 +153,26 @@ class TripTest extends TestCase
         // Franklin is about 25 km from Nashville: outside a 10 km radius.
         $this->assertSame(0, $this->database()->table('notifications')->where('type', 'memberMapTripNearby')->count());
     }
+
+    #[Test]
+    public function asking_again_while_the_place_is_looked_up_counts_the_trip_once()
+    {
+        $container = $this->app()->getContainer();
+        $queue = new \Illuminate\Support\Testing\Fakes\QueueFake($container);
+        $container->instance(\Illuminate\Contracts\Queue\Queue::class, $queue);
+        $geocoder = $container->make(FakeGeocoder::class);
+        $container->instance(Geocoder::class, $geocoder);
+        $trip = ['lat' => 36.15, 'lng' => -86.78, 'starts' => $this->days(3), 'ends' => $this->days(7)];
+
+        // The browser asks three times while the lookup waits for a worker.
+        foreach ([1, 2, 3] as $ask) {
+            $this->assertSame(429, $this->post($trip)[0]);
+        }
+        $queue->pushed(\ErnestDefoe\MemberMap\Job\LookUpPlace::class)->first()->handle($geocoder);
+        $this->assertSame(201, $this->post($trip)[0]);
+
+        $cache = $container->make(\Illuminate\Contracts\Cache\Repository::class);
+        $this->assertSame(1, (int) $cache->get('member-map:rate:trips:2:'.intdiv(time(), 86400)));
+        $this->assertSame(1, (int) $cache->get('member-map:rate:m:2:'.intdiv(time(), 60)));
+    }
 }

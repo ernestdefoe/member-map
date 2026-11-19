@@ -4,6 +4,7 @@ namespace ErnestDefoe\MemberMap\Api\Resource;
 
 use Carbon\Carbon;
 use ErnestDefoe\MemberMap\Api\Problem;
+use ErnestDefoe\MemberMap\Api\RateLimit;
 use ErnestDefoe\MemberMap\Event\MeetupPlanned;
 use ErnestDefoe\MemberMap\Integrations\MeetupTags;
 use ErnestDefoe\MemberMap\Meetup;
@@ -45,6 +46,7 @@ class MeetupResource extends AbstractDatabaseResource
         private readonly Meetups $meetups,
         private readonly MeetupTags $tags,
         private readonly Dispatcher $dispatcher,
+        private readonly RateLimit $limit,
     ) {
     }
 
@@ -149,6 +151,7 @@ class MeetupResource extends AbstractDatabaseResource
         $input = (array) ($context->body()['data']['attributes'] ?? []);
         [$title, $details] = $this->words($input);
         $startsLocal = $model->starts_at->copy()->setTimezone($model->timezone ?: 'UTC');
+        $this->limit->countDaily($context->getActor(), 'meetups');
 
         $this->dispatcher->dispatch(new MeetupPlanned($model, $context->getActor(), $title, $details, $startsLocal));
 

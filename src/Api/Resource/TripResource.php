@@ -4,6 +4,7 @@ namespace ErnestDefoe\MemberMap\Api\Resource;
 
 use Carbon\Carbon;
 use ErnestDefoe\MemberMap\Api\Problem;
+use ErnestDefoe\MemberMap\Api\RateLimit;
 use ErnestDefoe\MemberMap\Job\NotifyNearbyMembers;
 use ErnestDefoe\MemberMap\Places;
 use ErnestDefoe\MemberMap\Precision;
@@ -40,6 +41,7 @@ class TripResource extends AbstractDatabaseResource
         private readonly Places $places,
         private readonly Trips $trips,
         private readonly Queue $queue,
+        private readonly RateLimit $limit,
     ) {
     }
 
@@ -108,6 +110,7 @@ class TripResource extends AbstractDatabaseResource
     /** @param Context $context */
     public function created(object $model, BaseContext $context): ?object
     {
+        $this->limit->countDaily($context->getActor(), 'trips');
         $this->queue->push(new NotifyNearbyMembers($model->id, $context->getActor()->id));
 
         return $model;

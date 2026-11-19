@@ -24,7 +24,7 @@ class Places
 
     /**
      * @param array<string, mixed> $input with lat and lng
-     * @param array{0: string, 1: int}|null $daily a per-day cap on this kind of save: [kind, max]
+     * @param array{0: string, 1: int}|null $daily a per-day cap on this kind of save: [kind, max], checked here and counted by the caller once saved
      * @return array{lat: float, lng: float, label: string, country_code: string|null, region: string|null, timezone: string|null}
      */
     public function around(User $actor, array $input, string $precision, ?array $daily = null): array
@@ -37,7 +37,7 @@ class Places
             throw new Problem('member_map_slow_down');
         }
 
-        $place = $this->geocoder->place((float) $input['lat'], Point::lng((float) $input['lng']), $precision, $this->locale());
+        $place = $this->geocoder->place((float) $input['lat'], Point::lng((float) $input['lng']), $precision, $this->locale(), $actor);
 
         if (! $place) {
             throw new Problem('member_map_no_place');

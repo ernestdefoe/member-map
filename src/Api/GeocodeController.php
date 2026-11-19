@@ -59,6 +59,6 @@ class GeocodeController implements RequestHandlerInterface
             throw new Problem('member_map_slow_down');
         }
 
-        return new JsonResponse(['places' => $this->geocoder->search($q, $this->translator->getLocale())]);
+        return new JsonResponse(['places' => $this->geocoder->search($q, $this->translator->getLocale(), $actor)]);
     }
 }
