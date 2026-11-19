@@ -100,9 +100,9 @@ const rethrow = (error: any): never => {
  * Sends a request, with any error shown to the member. A place the forum
  * hasn't looked up yet is queued on the server, which answers "busy" rather
  * than keep the request waiting: that answer is asked again, quietly, every
- * second (six times at most, for a queue worker to get to it).
+ * second, for about 15 seconds (a queue worker may be busy with other jobs).
  */
-function retrying<T>(send: () => Promise<T>, retries = 6): Promise<T> {
+function retrying<T>(send: () => Promise<T>, retries = 14): Promise<T> {
   return send().catch((error) => {
     if (retries > 0 && isBusy(error)) return wait(1100).then(() => retrying(send, retries - 1));
     app.alerts.show({ type: 'error' }, errorText(error));

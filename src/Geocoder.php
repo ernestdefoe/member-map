@@ -278,7 +278,7 @@ class Geocoder
         if ($this->resting()) {
             throw new GeocoderUnavailable('Geocoder failed recently.');
         }
-        if ($this->cache->add('member-map:geocoder:queued:'.$key, true, 30)) {
+        if ($this->cache->add('member-map:geocoder:queued:'.$key, true, 15)) {
             if ($for) {
                 $this->limit->countLookup($for);
             }
