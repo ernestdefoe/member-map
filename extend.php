@@ -92,6 +92,8 @@ return [
         ->default('ernestdefoe-member-map.geocoder_url', 'https://nominatim.openstreetmap.org')
         ->default('ernestdefoe-member-map.nav', true)
         ->default('ernestdefoe-member-map.profile', true)
+        ->default('ernestdefoe-member-map.trip_radius_km', 160)
+        ->default('ernestdefoe-member-map.trip_max_alerts', 50)
         // An emptied style means "use the picture tiles", so empty is sent as null.
         ->serializeToForum('memberMapStyle', 'ernestdefoe-member-map.style_url', fn ($value) => trim((string) $value) ?: null)
         ->serializeToForum('memberMapStyleDark', 'ernestdefoe-member-map.style_dark_url', fn ($value) => trim((string) $value) ?: null)

@@ -5,29 +5,34 @@ namespace ErnestDefoe\MemberMap;
 use Carbon\Carbon;
 use Flarum\Http\UrlGenerator;
 use Flarum\Settings\SettingsRepositoryInterface;
+use ErnestDefoe\MemberMap\Job\LookUpPlace;
 use GuzzleHttp\Client;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Contracts\Queue\Queue;
 use Illuminate\Database\ConnectionInterface;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
  * Place search and place lookup, server-side, against Nominatim or anything
  * that speaks its API (a self-hosted Nominatim, LocationIQ).
  *
+ * A request never calls the provider itself. It answers from the 30-day
+ * cache in member_map_geocode; on a miss it queues the lookup (LookUpPlace)
+ * and answers "ask again in a moment" (GeocoderBusy), and the browser asks
+ * again a second later. With Flarum's default sync queue the job has already
+ * run by then, so the first answer is usually there at once.
+ *
  * Nominatim's usage policy, and how it is met:
  *  - at most one request a second, from the whole forum: a cache lock plus a
- *    timestamp space every call (throttle()). A call that would come too soon
- *    is refused at once (GeocoderBusy, "try again in a moment"), and the
- *    browser asks again a second later: no PHP worker ever waits for a turn;
+ *    timestamp space every call (throttle()). A lookup that would come too
+ *    soon is dropped, and the member's next ask queues it again;
  *  - an identifying User-Agent naming the forum;
- *  - results cached: every answer is kept 30 days in member_map_geocode;
+ *  - every answer kept 30 days (pruned daily by member-map:prune);
  *  - no search-as-you-type: the browser only searches when asked to.
  * Nothing here is ever called while rendering a page: only when a member
- * searches for, or saves, their own location. That lookup stays in the
- * request on purpose: the member is waiting for the answer (a list of places,
- * or the place their pin is in), every answer is cached, and the request is
- * capped at 6 seconds. Old answers are pruned by the member-map:prune command.
+ * searches for, or saves, their own location.
  */
 class Geocoder
 {
@@ -42,6 +47,8 @@ class Geocoder
         protected ConnectionInterface $db,
         protected Cache $cache,
         protected Client $http,
+        protected Queue $queue,
+        protected LoggerInterface $log,
     ) {
     }
 
@@ -52,12 +59,12 @@ class Geocoder
      */
     public function search(string $query, string $locale): array
     {
-        $results = $this->remember('search', ['q' => mb_strtolower($query), 'lang' => $locale], fn () => $this->fetch('search', [
+        $results = $this->remember(['search', mb_strtolower($query), $locale], 'search', [
             'q' => $query,
             'limit' => 6,
             'addressdetails' => 0,
             'accept-language' => $locale,
-        ]));
+        ]);
 
         $places = [];
         foreach (is_array($results) ? $results : [] as $result) {
@@ -89,13 +96,13 @@ class Geocoder
         $lng = round($lng, 4);
         $zoom = Precision::zoom($precision);
 
-        $result = $this->remember('reverse', compact('lat', 'lng', 'zoom', 'locale'), fn () => $this->fetch('reverse', [
+        $result = $this->remember(['reverse', $lat, $lng, $zoom, $locale], 'reverse', [
             'lat' => $lat,
             'lon' => $lng,
             'zoom' => $zoom,
             'addressdetails' => 1,
             'accept-language' => $locale,
-        ]));
+        ]);
 
         if (! is_array($result) || isset($result['error']) || ! isset($result['lat'], $result['lon'])) {
             return null;
@@ -155,7 +162,31 @@ class Geocoder
     }
 
     /**
-     * One HTTP request to the geocoder, at least a second after the last.
+     * The queued half (LookUpPlace): one call to the provider, spaced from the
+     * last, its answer stored for the member's next ask. A call that would come
+     * too soon is dropped; a failure is logged and the provider rested.
+     *
+     * @param array<string, scalar> $query
+     */
+    public function lookUp(string $key, string $endpoint, array $query): void
+    {
+        try {
+            if (! $this->cached($key)) {
+                $this->store($key, $this->throttle(fn () => $this->fetch($endpoint, $query)));
+            }
+        } catch (GeocoderBusy) {
+            // Under a second since the last call: the member's next ask queues it again.
+        } catch (GeocoderUnavailable $e) {
+            // Don't hammer a provider that is down: every lookup waits half a minute.
+            $this->cache->put('member-map:geocoder:down', true, 30);
+            $this->log->warning('[member-map] place lookup failed: '.($e->getPrevious()?->getMessage() ?? $e->getMessage()));
+        } finally {
+            $this->cache->forget('member-map:geocoder:queued:'.$key);
+        }
+    }
+
+    /**
+     * One HTTP request to the geocoder.
      *
      * Protected so tests can answer without the network.
      *
@@ -173,25 +204,23 @@ class Geocoder
             $query['key'] = $key;
         }
 
-        return $this->throttle(function () use ($base, $endpoint, $query) {
-            $response = $this->http->get("$base/$endpoint", [
-                'query' => $query,
-                'timeout' => 6,
-                'connect_timeout' => 3,
-                'headers' => [
-                    'User-Agent' => 'Flarum Member Map (+'.$this->url->to('forum')->base().')',
-                    'Accept' => 'application/json',
-                ],
-                'http_errors' => true,
-            ]);
+        $response = $this->http->get("$base/$endpoint", [
+            'query' => $query,
+            'timeout' => 6,
+            'connect_timeout' => 3,
+            'headers' => [
+                'User-Agent' => 'Flarum Member Map (+'.$this->url->to('forum')->base().')',
+                'Accept' => 'application/json',
+            ],
+            'http_errors' => true,
+        ]);
 
-            return json_decode((string) $response->getBody(), true);
-        });
+        return json_decode((string) $response->getBody(), true);
     }
 
     protected function throttle(callable $request): mixed
     {
-        if ($this->cache->get('member-map:geocoder:down')) {
+        if ($this->resting()) {
             throw new GeocoderUnavailable('Geocoder failed recently.');
         }
 
@@ -219,9 +248,6 @@ class Geocoder
         try {
             return $request();
         } catch (Throwable $e) {
-            // Don't hammer a provider that is down: everyone waits half a minute.
-            $this->cache->put('member-map:geocoder:down', true, 30);
-
             throw new GeocoderUnavailable('Geocoder request failed.', 0, $e);
         } finally {
             $this->cache->put('member-map:geocoder:last', sprintf('%.4f', microtime(true)), 60);
@@ -229,23 +255,57 @@ class Geocoder
     }
 
     /**
-     * @param array<string, scalar> $parts
-     * @param callable(): mixed $fetch
+     * The cached answer, or the lookup queued and "ask again in a moment".
+     *
+     * @param list<scalar> $parts what makes this lookup unique
+     * @param array<string, scalar> $query
      */
-    private function remember(string $type, array $parts, callable $fetch): mixed
+    private function remember(array $parts, string $endpoint, array $query): mixed
     {
-        $key = hash('sha256', json_encode([$type, $parts, (string) $this->settings->get(Settings::GEOCODER)]) ?: $type);
-        $table = $this->db->table('member_map_geocode');
+        $key = hash('sha256', json_encode([...$parts, (string) $this->settings->get(Settings::GEOCODER)]) ?: $endpoint);
 
-        $row = $table->clone()->where('key', $key)->where('created_at', '>', Carbon::now()->subDays(self::KEEP_DAYS))->value('result');
-        if ($row !== null) {
-            return json_decode((string) $row, true);
+        if ($found = $this->cached($key)) {
+            return $found[0];
+        }
+        if ($this->resting()) {
+            throw new GeocoderUnavailable('Geocoder failed recently.');
+        }
+        if ($this->cache->add('member-map:geocoder:queued:'.$key, true, 30)) {
+            $this->queue->push(new LookUpPlace($key, $endpoint, $query));
         }
 
-        $result = $fetch();
+        // A sync queue has already run the lookup.
+        if ($found = $this->cached($key)) {
+            return $found[0];
+        }
+        if ($this->resting()) {
+            throw new GeocoderUnavailable('Geocoder failed just now.');
+        }
 
-        $table->clone()->upsert([['key' => $key, 'result' => json_encode($result), 'created_at' => Carbon::now()]], ['key'], ['result', 'created_at']);
+        throw new GeocoderBusy('Looking it up: ask again in a moment.');
+    }
 
-        return $result;
+    /**
+     * Whether the provider failed in the last half minute. Impure: a sync
+     * queue's lookup may have just failed and set it.
+     *
+     * @phpstan-impure
+     */
+    private function resting(): bool
+    {
+        return (bool) $this->cache->get('member-map:geocoder:down');
+    }
+
+    /** @return array{0: mixed}|null the stored answer, wrapped (an answer may itself be null) */
+    private function cached(string $key): ?array
+    {
+        $row = $this->db->table('member_map_geocode')->where('key', $key)->where('created_at', '>', Carbon::now()->subDays(self::KEEP_DAYS))->value('result');
+
+        return $row === null ? null : [json_decode((string) $row, true)];
+    }
+
+    private function store(string $key, mixed $result): void
+    {
+        $this->db->table('member_map_geocode')->upsert([['key' => $key, 'result' => json_encode($result), 'created_at' => Carbon::now()]], ['key'], ['result', 'created_at']);
     }
 }

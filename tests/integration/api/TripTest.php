@@ -125,4 +125,32 @@ class TripTest extends TestCase
         $queue->assertPushed(\ErnestDefoe\MemberMap\Job\NotifyNearbyMembers::class);
         $this->assertSame(0, $this->database()->table('notifications')->where('type', 'memberMapTripNearby')->count());
     }
+
+    #[Test]
+    public function neighbors_hear_about_a_trip_when_the_map_is_open_to_everyone()
+    {
+        $permissions = $this->database()->table('group_permission');
+        $permissions->clone()->where('permission', 'like', 'member-map.%')->delete();
+        foreach (['member-map.view', 'member-map.list', 'member-map.travel'] as $permission) {
+            $permissions->clone()->insert(['group_id' => \Flarum\Group\Group::GUEST_ID, 'permission' => $permission]);
+        }
+        $this->fake();
+
+        $this->assertSame(201, $this->post(['lat' => 36.15, 'lng' => -86.78, 'starts' => $this->days(3), 'ends' => $this->days(7)])[0]);
+
+        $notified = $this->database()->table('notifications')->where('type', 'memberMapTripNearby')->pluck('user_id')->all();
+        $this->assertSame([3], array_map('intval', $notified));
+    }
+
+    #[Test]
+    public function the_admin_sets_how_far_the_alert_reaches()
+    {
+        $this->setting('ernestdefoe-member-map.trip_radius_km', '10');
+        $this->fake();
+
+        $this->assertSame(201, $this->post(['lat' => 36.15, 'lng' => -86.78, 'starts' => $this->days(3), 'ends' => $this->days(7)])[0]);
+
+        // Franklin is about 25 km from Nashville: outside a 10 km radius.
+        $this->assertSame(0, $this->database()->table('notifications')->where('type', 'memberMapTripNearby')->count());
+    }
 }

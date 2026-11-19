@@ -1,5 +1,6 @@
 import app from 'flarum/forum/app';
 import extractText from 'flarum/common/utils/extractText';
+import type Model from 'flarum/common/Model';
 
 /** [id, lat, lng, name, slug, avatar, countryCode, timezone, label, flags]; flags: 1 online, 2 new on the map. */
 export type Member = [
@@ -91,47 +92,50 @@ export function errorText(error: any): string {
 const isBusy = (error: any) => error?.response?.errors?.[0]?.code === 'member_map_busy';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const rethrow = (error: any): never => {
+  throw error;
+};
+
 /**
- * One request, with the error shown to the member. The place search answers
- * "busy" rather than keep a request waiting for its one-a-second turn: that
- * answer is asked again, quietly, a second later (twice at most).
+ * Sends a request, with any error shown to the member. A place the forum
+ * hasn't looked up yet is queued on the server, which answers "busy" rather
+ * than keep the request waiting: that answer is asked again, quietly, every
+ * second (six times at most, for a queue worker to get to it).
  */
-function request<T>(options: { method: string; url: string; body?: any }, retries = 2): Promise<T> {
-  return app
-    .request<T>({
-      ...options,
-      errorHandler: (error: any) => {
-        throw error;
-      },
-    })
-    .catch((error) => {
-      if (retries > 0 && isBusy(error)) return wait(1100).then(() => request<T>(options, retries - 1));
-      app.alerts.show({ type: 'error' }, errorText(error));
-      throw error;
-    });
-}
-
-/** Our read-only endpoints under /api/member-map (the map, the place search, filters, stats). */
-export function call<T>(path: string, query?: Record<string, string>): Promise<T> {
-  const url = app.forum.attribute<string>('apiUrl') + '/member-map' + path;
-  return request<T>({ method: 'GET', url: query ? url + '?' + new URLSearchParams(query).toString() : url });
-}
-
-/** Our JSON:API resources: member-map-locations, member-map-trips and member-map-meetups. */
-export function save<T>(
-  method: 'POST' | 'PATCH' | 'DELETE',
-  type: string,
-  id: string | null,
-  attributes?: Record<string, any>
-): Promise<{ data: { id: string; attributes: T } }> {
-  return request({
-    method,
-    url: app.forum.attribute<string>('apiUrl') + '/' + type + (id ? '/' + id : ''),
-    body: method === 'DELETE' ? undefined : { data: { type, ...(id ? { id } : {}), attributes } },
+function retrying<T>(send: () => Promise<T>, retries = 6): Promise<T> {
+  return send().catch((error) => {
+    if (retries > 0 && isBusy(error)) return wait(1100).then(() => retrying(send, retries - 1));
+    app.alerts.show({ type: 'error' }, errorText(error));
+    throw error;
   });
 }
 
-/** For .catch() after call() or save(): the member has already been shown the error. */
+/** Our read-only endpoints under /api/member-map: the map's rows and the place lookup. */
+export function call<T>(path: string, query?: Record<string, string>): Promise<T> {
+  const url = app.forum.attribute<string>('apiUrl') + '/member-map' + path;
+  return retrying(() =>
+    app.request<T>({ method: 'GET', url: query ? url + '?' + new URLSearchParams(query).toString() : url, errorHandler: rethrow })
+  );
+}
+
+/** A record of ours as the store knows it: a new one (no id), or one that exists (put in the store if it isn't yet). */
+function record<M extends Model>(type: string, id: string | null): M {
+  if (!id) return app.store.createRecord<M>(type, { attributes: {} });
+  return app.store.getById<M>(type, id) || (app.store.pushObject<M>({ type, id, attributes: {} }) as M);
+}
+
+/** Saves one of our resources through the store: member-map-locations, -trips or -meetups. */
+export function saveRecord<M extends Model>(type: string, id: string | null, attributes: Record<string, any>): Promise<M> {
+  const target = record<M>(type, id);
+  return retrying(() => target.save(attributes, { errorHandler: rethrow })) as Promise<M>;
+}
+
+export function deleteRecord(type: string, id: string): Promise<void> {
+  const target = record(type, id);
+  return retrying(() => target.delete(undefined, { errorHandler: rethrow }));
+}
+
+/** For .catch() after call(), saveRecord() or deleteRecord(): the member has already been shown the error. */
 export function shown(): void {
   // request() alerted the member; the caller only resets its own state in .finally().
 }
@@ -153,7 +157,7 @@ export function openLocationForm(attrs: { onsave?: (place: Place | null) => void
 }
 
 export function removeLocation(): Promise<void> {
-  return save('DELETE', 'member-map-locations', String(app.session.user!.id())).then(() => {
+  return deleteRecord('member-map-locations', String(app.session.user!.id())).then(() => {
     remember(null);
     app.alerts.show({ type: 'success' }, t('location.removed'));
   });

@@ -230,4 +230,29 @@ class MapTest extends TestCase
 
         $this->assertSame(0, $this->database()->table('member_map_locations')->where('user_id', 3)->count());
     }
+
+    #[Test]
+    public function a_permission_granted_to_everyone_covers_every_member()
+    {
+        // "Everyone" is stored on the Guest group alone; members inherit it.
+        $this->grant([[Group::GUEST_ID, 'member-map.view'], [Group::GUEST_ID, 'member-map.list']]);
+
+        [$status, $body] = $this->get('/api/member-map', 2);
+
+        $this->assertSame(200, $status);
+        $this->assertContains(3, array_column($body['members'], 0));
+    }
+
+    #[Test]
+    public function a_member_who_may_no_longer_be_on_the_map_loses_the_profile_line_too()
+    {
+        // Only admins may be listed now: user 3 keeps their saved place but leaves the map, card and profile.
+        $this->grant([[Group::MEMBER_ID, 'member-map.view']]);
+
+        [, $profile] = $this->get('/api/users/3', 2);
+
+        $this->assertNull($profile['data']['attributes']['memberMapLocation']);
+        $this->assertNull($profile['data']['attributes']['memberMapPoint']);
+        $this->assertSame(1, $this->database()->table('member_map_locations')->where('user_id', 3)->count());
+    }
 }

@@ -5,7 +5,7 @@ import Link from 'flarum/common/components/Link';
 import Icon from 'flarum/common/components/Icon';
 import extractText from 'flarum/common/utils/extractText';
 import type Mithril from 'mithril';
-import { countryName, dateRange, flag, localTime, ONLINE, save, shown, t, type Member } from '../../api';
+import { countryName, dateRange, deleteRecord, flag, localTime, ONLINE, shown, t, type Member } from '../../api';
 import { CONTINENTS, continentOf } from '../../continents';
 import { distanceKm, roughDistance } from '../../units';
 import { Avatar, meetupWhen, NEAR_MAX, profileUrl } from './shared';
@@ -181,7 +181,7 @@ export function myTrips(page: MapPage): Mithril.Children {
               className="Button Button--link"
               icon="fas fa-xmark"
               onclick={() =>
-                save('DELETE', 'member-map-trips', String(trip.id))
+                deleteRecord('member-map-trips', String(trip.id))
                   .then(() => page.load())
                   .catch(shown)
               }

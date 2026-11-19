@@ -4,28 +4,31 @@ namespace ErnestDefoe\MemberMap;
 
 use ErnestDefoe\MemberMap\Notification\TripNearbyBlueprint;
 use Flarum\Notification\NotificationSyncer;
+use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
 
 /**
- * Who hears about a trip: members who live within 160 km (100 mi) of it, may
- * see the map, and haven't switched the alert off (NotificationSyncer reads
- * their preference). The 50 nearest at most, found with one bounding-box query.
+ * Who hears about a trip: members who live within the admin's radius of it
+ * (160 km, 100 mi, by default), may see the map, and haven't switched the
+ * alert off (NotificationSyncer reads their preference). The nearest 50 at
+ * most by default, found with one bounding-box query.
  */
 class Trips
 {
-    public const RADIUS_KM = 160;
-    private const MAX_RECIPIENTS = 50;
-
     public function __construct(
         private readonly MemberQuery $members,
         private readonly NotificationSyncer $notifications,
+        private readonly SettingsRepositoryInterface $settings,
     ) {
     }
 
     public function notify(Trip $trip, User $traveler): void
     {
+        // Clamped here as well as in the admin form: a hand-made settings request can't make the query unbounded.
+        $radius = max(10, min(1000, (int) $this->settings->get(Settings::TRIP_RADIUS_KM)));
+        $recipients = max(1, min(200, (int) $this->settings->get(Settings::TRIP_MAX_ALERTS)));
         $table = (new Location())->getTable();
-        $dLat = self::RADIUS_KM / 111;
+        $dLat = $radius / 111;
         $dLng = $dLat / max(0.1, cos(deg2rad($trip->lat)));
 
         $nearby = $this->members->permitted($traveler, Settings::VIEW)
@@ -36,9 +39,9 @@ class Trips
             ->limit(500)
             ->get(['users.*', "$table.lat as mm_lat", "$table.lng as mm_lng"])
             ->map(fn (User $user) => [$user, self::km($trip->lat, $trip->lng, (float) $user->getAttribute('mm_lat'), (float) $user->getAttribute('mm_lng'))])
-            ->filter(fn ($pair) => $pair[1] <= self::RADIUS_KM)
+            ->filter(fn ($pair) => $pair[1] <= $radius)
             ->sortBy(fn ($pair) => $pair[1])
-            ->take(self::MAX_RECIPIENTS)
+            ->take($recipients)
             ->map(fn ($pair) => $pair[0])
             ->values()
             ->all();

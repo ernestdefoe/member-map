@@ -87,4 +87,18 @@ class MeetupTest extends TestCase
         $this->assertSame(0, Meetup::query()->count());
         $this->assertSame(1, Discussion::query()->count());
     }
+
+    #[Test]
+    public function a_meetup_that_fails_to_save_leaves_no_discussion_behind()
+    {
+        $this->fake();
+        $this->app();
+        Meetup::saving(fn () => throw new \RuntimeException('disk full'));
+
+        [$status] = $this->post(['title' => 'Picnic', 'lat' => 36.16, 'lng' => -86.78, 'startsLocal' => Carbon::now()->addDays(3)->format('Y-m-d\TH:i')]);
+
+        $this->assertSame(500, $status);
+        $this->assertSame(0, Meetup::query()->count());
+        $this->assertSame(0, Discussion::query()->count());
+    }
 }

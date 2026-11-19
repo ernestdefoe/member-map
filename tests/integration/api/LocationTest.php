@@ -278,4 +278,29 @@ class LocationTest extends TestCase
         $this->assertLessThan(0.5, microtime(true) - $started, 'The request did not wait for its turn.');
         $this->assertSame(1, $geocoder->calls);
     }
+
+    #[Test]
+    public function with_a_real_queue_the_request_never_calls_the_provider_itself()
+    {
+        $queue = new \Illuminate\Support\Testing\Fakes\QueueFake($this->app()->getContainer());
+        $this->app()->getContainer()->instance(\Illuminate\Contracts\Queue\Queue::class, $queue);
+        // The geocoder was built with the real queue: build it again with the fake one.
+        $geocoder = $this->fake();
+
+        $search = fn () => $this->send($this->request('GET', '/api/member-map/geocode', ['authenticatedAs' => 2])->withQueryParams(['q' => 'Nashville']));
+
+        $first = $search();
+        $this->assertSame(429, $first->getStatusCode());
+        $this->assertSame('member_map_busy', json_decode((string) $first->getBody(), true)['errors'][0]['code']);
+        $this->assertSame(0, $geocoder->calls);
+        $queue->assertPushed(\ErnestDefoe\MemberMap\Job\LookUpPlace::class, 1);
+
+        // The worker runs the lookup; the member's next ask is answered from the cache.
+        $queue->pushed(\ErnestDefoe\MemberMap\Job\LookUpPlace::class)->first()->handle($geocoder);
+        $this->assertSame(1, $geocoder->calls);
+
+        $second = $search();
+        $this->assertSame(200, $second->getStatusCode());
+        $this->assertSame('Nashville, Davidson County, Tennessee, United States', json_decode((string) $second->getBody(), true)['places'][0]['label']);
+    }
 }

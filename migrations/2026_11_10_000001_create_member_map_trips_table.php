@@ -6,7 +6,7 @@ use Illuminate\Database\Schema\Blueprint;
 /*
  * Travel pins: "visiting Chicago Dec 3-7". Like a home location, the point is
  * the centre of the city, never what was searched. A trip stops showing the
- * day after it ends and is deleted on a later write (Trips::prune).
+ * day after it ends; the member-map:prune command deletes it a month later.
  */
 return Migration::createTable('member_map_trips', function (Blueprint $table) {
     $table->increments('id');

@@ -8,8 +8,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * "Where we are" as a Page Builder block. Registered from extend.php only
- * when Page Builder is installed (class_exists), so this file is never loaded
- * without its interface. The block draws itself in the browser from the same
+ * while Page Builder is enabled (Extend\Conditional), so this file is never
+ * loaded without its interface. The block draws itself in the browser from the same
  * cached stats endpoint as the other widget hosts, so it resolves nothing here.
  */
 class WhereWeAreBlock implements BlockInterface

@@ -4,7 +4,8 @@ import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import Stream from 'flarum/common/utils/Stream';
 import type Mithril from 'mithril';
-import { browserZone, call, remember, save, shown, t, type Place, type SearchResult } from '../api';
+import { browserZone, call, remember, saveRecord, shown, t, type Place, type SearchResult } from '../api';
+import type MemberMapLocation from '../models/MemberMapLocation';
 import PlaceSearch from './PlaceSearch';
 import PinMap from './PinMap';
 
@@ -210,9 +211,9 @@ export default class LocationModal extends FormModal<LocationModalAttrs> {
     const moved = !!point && (!!this.point || this.own?.precision !== this.precision);
     if (moved) Object.assign(attributes, point, { precision: this.precision, browserTimezone: browserZone() });
 
-    save<Place>(moved ? 'POST' : 'PATCH', 'member-map-locations', moved ? null : String(app.session.user!.id()), attributes)
-      .then(({ data }) => {
-        const place = data.attributes;
+    saveRecord<MemberMapLocation>('member-map-locations', moved ? null : String(app.session.user!.id()), attributes)
+      .then((saved) => {
+        const place = saved.place();
         remember(place);
         this.attrs.onsave?.(place);
         app.alerts.show({ type: 'success' }, tl('saved'));

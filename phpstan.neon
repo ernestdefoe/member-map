@@ -11,7 +11,13 @@ parameters:
     paths:
         - extend.php
         - src
+        # Read for the followedUsers relationship it registers (FollowUsersFollows); its own code isn't ours to check.
+        - vendor/ianm/follow-users/extend.php
     ignoreErrors:
+        -
+            message: '#.*#'
+            path: vendor/ianm/follow-users/extend.php
+            reportUnmatched: false
         # Page Builder is a private package: its extender is only built when it is enabled (Extend\Conditional).
         -
             identifier: class.notFound
@@ -20,5 +26,3 @@ parameters:
     excludePaths:
         # Implements Page Builder's interface; loaded only when Page Builder is installed.
         - src/Widget/WhereWeAreBlock.php
-        # Uses Calendar's model; registered only when Calendar is enabled (Extend\Conditional).
-        - src/Integrations/AddMeetupToCalendar.php

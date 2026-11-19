@@ -21,6 +21,7 @@ use Flarum\Discussion\Discussion;
 use Flarum\User\Exception\PermissionDeniedException;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Builder;
+use Throwable;
 use Tobyz\JsonApiServer\Context as BaseContext;
 
 /**
@@ -122,6 +123,24 @@ class MeetupResource extends AbstractDatabaseResource
         $model->setRelation('discussion', $discussion);
 
         return $model;
+    }
+
+    /**
+     * The discussion is started before the meetup is saved: if that save fails,
+     * the discussion goes too, so no meetup discussion is left without its pin.
+     *
+     * @param Meetup $model
+     * @param Context $context
+     */
+    public function create(object $model, BaseContext $context): object
+    {
+        try {
+            return parent::create($model, $context);
+        } catch (Throwable $e) {
+            $model->discussion?->delete();
+
+            throw $e;
+        }
     }
 
     /** @param Context $context */

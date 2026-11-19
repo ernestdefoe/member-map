@@ -3,7 +3,7 @@ import FormModal, { type IFormModalAttrs } from 'flarum/common/components/FormMo
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import type Mithril from 'mithril';
-import { save, shown, t, type SearchResult } from '../api';
+import { saveRecord, shown, t, type SearchResult } from '../api';
 import PlaceSearch from './PlaceSearch';
 
 /**
@@ -62,7 +62,7 @@ export default class TripModal extends FormModal<IFormModalAttrs & { onsave?: ()
     e.preventDefault();
     if (!this.place) return;
     this.loading = true;
-    save('POST', 'member-map-trips', null, { lat: this.place.lat, lng: this.place.lng, starts: this.starts(), ends: this.ends() })
+    saveRecord('member-map-trips', null, { lat: this.place.lat, lng: this.place.lng, starts: this.starts(), ends: this.ends() })
       .then(() => {
         app.alerts.show({ type: 'success' }, tt('saved'));
         this.attrs.onsave?.();

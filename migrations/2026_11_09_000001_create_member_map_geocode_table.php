@@ -5,8 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 
 /*
  * Answers from the geocoder, so one place is looked up once, not once per
- * member (Nominatim's usage policy asks for exactly this). Pruned on write:
- * see Geocoder::remember().
+ * member (Nominatim's usage policy asks for exactly this). Kept 30 days:
+ * the member-map:prune command deletes older answers daily.
  */
 return Migration::createTable('member_map_geocode', function (Blueprint $table) {
     $table->string('key', 64)->primary();

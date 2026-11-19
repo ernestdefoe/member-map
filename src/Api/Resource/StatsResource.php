@@ -21,7 +21,8 @@ use Tobyz\JsonApiServer\Context;
  *
  * For the "Where we are" widget, which sits on pages that aren't the map:
  * counts only, no names or places. One grouped query, cached ten minutes
- * (one entry for guests, one for members: guests don't count members-only).
+ * per set of groups: who a viewer may see (members-only places, hidden users)
+ * follows their groups, so viewers in the same groups share one count.
  * Never served to crawlers.
  */
 class StatsResource extends AbstractResource implements Findable
@@ -47,7 +48,9 @@ class StatsResource extends AbstractResource implements Findable
         Crawlers::refuse($context->request);
         $actor = $context->getActor();
 
-        return (object) $this->cache->remember('member-map:stats:'.($actor->isGuest() ? 'guest' : 'member'), 600, fn () => $this->count($actor));
+        $groups = $actor->isGuest() ? 'guest' : implode(',', $actor->groups->pluck('id')->sort()->all());
+
+        return (object) $this->cache->remember('member-map:stats:'.sha1($groups), 600, fn () => $this->count($actor));
     }
 
     public function endpoints(): array

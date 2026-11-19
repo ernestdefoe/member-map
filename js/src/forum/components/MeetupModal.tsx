@@ -3,7 +3,8 @@ import FormModal, { type IFormModalAttrs } from 'flarum/common/components/FormMo
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import type Mithril from 'mithril';
-import { browserZone, save, shown, t, type SearchResult } from '../api';
+import { browserZone, saveRecord, shown, t, type SearchResult } from '../api';
+import type MemberMapMeetup from '../models/MemberMapMeetup';
 import PlaceSearch from './PlaceSearch';
 
 /**
@@ -79,7 +80,7 @@ export default class MeetupModal extends FormModal<IFormModalAttrs & { onsave?: 
     e.preventDefault();
     if (!this.place) return;
     this.loading = true;
-    save<{ discussionId: number; discussionSlug: string }>('POST', 'member-map-meetups', null, {
+    saveRecord<MemberMapMeetup>('member-map-meetups', null, {
       title: this.name().trim(),
       details: this.details().trim(),
       lat: this.place.lat,
@@ -87,11 +88,11 @@ export default class MeetupModal extends FormModal<IFormModalAttrs & { onsave?: 
       startsLocal: this.when().slice(0, 16),
       browserTimezone: browserZone(),
     })
-      .then(({ data }) => {
+      .then((meetup) => {
         app.alerts.show({ type: 'success' }, tm('saved'));
         this.attrs.onsave?.();
         this.hide();
-        m.route.set(app.route('discussion', { id: `${data.attributes.discussionId}-${data.attributes.discussionSlug}` }));
+        m.route.set(app.route('discussion', { id: `${meetup.discussionId()}-${meetup.discussionSlug()}` }));
       })
       .catch(shown)
       .finally(() => {

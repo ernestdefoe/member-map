@@ -46,11 +46,12 @@ class MemberQuery
     {
         $query = User::whereVisibleTo($actor)->where('users.is_email_confirmed', true);
 
-        // Granted to Members, it covers every confirmed account; admins have every permission without a row.
+        // Granted to Everyone (stored on Guests, which every member inherits) or to Members, it covers
+        // every confirmed account; admins have every permission without a row.
         $granted = fn ($sub) => $sub->select('group_id')->from('group_permission')->where('permission', $permission);
 
         $query->where(fn ($q) => $q
-            ->whereExists(fn ($sub) => $sub->from('group_permission')->where('permission', $permission)->where('group_id', Group::MEMBER_ID))
+            ->whereExists(fn ($sub) => $sub->from('group_permission')->where('permission', $permission)->whereIn('group_id', [Group::GUEST_ID, Group::MEMBER_ID]))
             ->orWhereIn('users.id', fn ($sub) => $sub->select('user_id')->from('group_user')->where(fn ($in) => $in
                 ->where('group_id', Group::ADMINISTRATOR_ID)
                 ->orWhereIn('group_id', $granted))));

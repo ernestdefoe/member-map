@@ -39,6 +39,28 @@ export default [
     )
     .setting(
       () => ({
+        setting: setting('trip_radius_km'),
+        type: 'number',
+        min: 10,
+        max: 1000,
+        label: t('settings.trip_radius_km'),
+        help: t('settings.trip_radius_km_help'),
+      }),
+      78
+    )
+    .setting(
+      () => ({
+        setting: setting('trip_max_alerts'),
+        type: 'number',
+        min: 1,
+        max: 200,
+        label: t('settings.trip_max_alerts'),
+        help: t('settings.trip_max_alerts_help'),
+      }),
+      77
+    )
+    .setting(
+      () => ({
         setting: setting('style_url'),
         type: 'text',
         label: t('settings.style_url'),

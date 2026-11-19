@@ -3,10 +3,11 @@ import Link from 'flarum/common/components/Link';
 import type Mithril from 'mithril';
 import { countryName, flag, t } from './api';
 import { fof, hasFofWidgets, placed } from '../common/fofWidgets';
+import type MemberMapStats from './models/MemberMapStats';
 
 /**
  * "Where we are": how many members are on the map, in how many countries,
- * the top few, and a way in. Counts only, from /api/member-map-stats/map (one
+ * the top few, and a way in. Counts only, from the member-map-stats resource (one
  * grouped query, cached ten minutes on the server), fetched once per page
  * load and shared by every place the widget is shown.
  */
@@ -18,9 +19,10 @@ const store: { stats: { members: number; countries: [string, number][] } | null;
 function load() {
   if (store.stats || store.loading || !app.forum.attribute('memberMapCanView')) return;
   store.loading = true;
-  app
-    .request<any>({ method: 'GET', url: app.forum.attribute('apiUrl') + '/member-map-stats/map', errorHandler: stayHidden })
-    .then((document) => (store.stats = document.data.attributes))
+  app.store
+    .find<MemberMapStats>('member-map-stats', 'map', {}, { errorHandler: noAlert })
+    .then((stats) => (store.stats = { members: stats.members(), countries: stats.countries() }))
+    .catch(stayHidden)
     .finally(() => {
       store.loading = false;
       m.redraw();
@@ -31,6 +33,10 @@ function load() {
  * The widget sits on pages that aren't the map: if its counts can't load it
  * just doesn't show, rather than raise an alert about something nobody asked for.
  */
+function noAlert(): void {
+  // Not false: false would fall back to Flarum's alert.
+}
+
 function stayHidden(): void {
   store.stats = null;
 }
