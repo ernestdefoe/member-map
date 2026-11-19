@@ -255,4 +255,32 @@ class MapTest extends TestCase
         $this->assertNull($profile['data']['attributes']['memberMapPoint']);
         $this->assertSame(1, $this->database()->table('member_map_locations')->where('user_id', 3)->count());
     }
+
+    #[Test]
+    public function the_profile_line_costs_one_query_however_many_users_a_page_shows()
+    {
+        $this->grant();
+        $rows = [];
+        for ($id = 10; $id < 30; $id++) {
+            $rows[] = ['id' => $id, 'username' => "member$id", 'email' => "member$id@machine.local", 'is_email_confirmed' => 1];
+        }
+        $this->prepareDatabase([User::class => $rows]);
+        $this->database()->table('member_map_locations')->insert(array_map(fn ($row) => ['user_id' => $row['id'], 'lat' => 1, 'lng' => 1, 'precision' => 'city', 'label' => 'Somewhere', 'show_on_profile' => 1, 'updated_at' => Carbon::now()], $rows));
+
+        $queries = 0;
+        $this->database()->listen(function ($query) use (&$queries) {
+            $queries += str_contains($query->sql, 'member_map_locations') ? 1 : 0;
+        });
+        $count = function (int $limit) use (&$queries): int {
+            $queries = 0;
+            $response = $this->send($this->request('GET', '/api/users', ['authenticatedAs' => 1])->withQueryParams(['page' => ['limit' => $limit]]));
+            $this->assertSame(200, $response->getStatusCode());
+
+            return $queries;
+        };
+
+        // One for every listed user's line, plus the viewer's own place (they are first in the list).
+        $this->assertSame(2, $count(1));
+        $this->assertSame(2, $count(20));
+    }
 }
