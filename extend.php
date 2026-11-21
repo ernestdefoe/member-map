@@ -94,6 +94,7 @@ return [
         ->default('ernestdefoe-member-map.profile', true)
         ->default('ernestdefoe-member-map.trip_radius_km', 160)
         ->default('ernestdefoe-member-map.trip_max_alerts', 50)
+        ->default('ernestdefoe-member-map.distance_units', 'auto')
         // An emptied style means "use the picture tiles", so empty is sent as null.
         ->serializeToForum('memberMapStyle', 'ernestdefoe-member-map.style_url', fn ($value) => trim((string) $value) ?: null)
         ->serializeToForum('memberMapStyleDark', 'ernestdefoe-member-map.style_dark_url', fn ($value) => trim((string) $value) ?: null)
@@ -101,7 +102,9 @@ return [
         ->serializeToForum('memberMapTilesDark', 'ernestdefoe-member-map.tiles_dark_url', fn ($value) => trim((string) $value) ?: null)
         ->serializeToForum('memberMapAttribution', 'ernestdefoe-member-map.tiles_attribution', fn ($value) => trim((string) $value))
         ->serializeToForum('memberMapNav', 'ernestdefoe-member-map.nav', 'boolval')
-        ->serializeToForum('memberMapProfile', 'ernestdefoe-member-map.profile', 'boolval'),
+        ->serializeToForum('memberMapProfile', 'ernestdefoe-member-map.profile', 'boolval')
+        // Only the three known choices reach the browser: anything else is treated as "auto".
+        ->serializeToForum('memberMapDistanceUnits', 'ernestdefoe-member-map.distance_units', fn ($value) => in_array($value, ['km', 'mi'], true) ? $value : 'auto'),
 
     (new Extend\Event())
         // Emptied tile, credit and place search addresses go back to their defaults.

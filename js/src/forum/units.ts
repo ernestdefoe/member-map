@@ -1,7 +1,17 @@
+import app from 'flarum/forum/app';
+
 /** Countries that measure road distances in miles. */
 const MILES = ['US', 'GB', 'LR', 'MM'];
 
+/**
+ * Miles or kilometers for "Near you": the admin's choice, or with "auto" (the
+ * default) a guess from the browser's region. A browser set to US English in
+ * Australia guesses miles, which is why the admin can choose.
+ */
 export function usesMiles(): boolean {
+  const units = app.forum.attribute<string>('memberMapDistanceUnits');
+  if (units === 'km' || units === 'mi') return units === 'mi';
+
   const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
   const region = (languages.find((language) => language?.includes('-')) || '').split('-').pop()?.toUpperCase();
   return !!region && MILES.includes(region);

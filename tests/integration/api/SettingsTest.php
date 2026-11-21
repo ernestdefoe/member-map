@@ -60,4 +60,23 @@ class SettingsTest extends TestCase
         $this->assertNull($this->stored('ernestdefoe-member-map.tiles_attribution'));
         $this->assertNull($this->stored('ernestdefoe-member-map.cleared_by_migration'));
     }
+
+    /** @return array<string, array{0: string|null, 1: string}> */
+    public static function units(): array
+    {
+        return ['not set' => [null, 'auto'], 'kilometers' => ['km', 'km'], 'miles' => ['mi', 'mi'], 'anything else' => ['furlongs', 'auto']];
+    }
+
+    #[Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('units')]
+    public function distance_units_reach_the_browser_as_one_of_three_choices(?string $saved, string $sent)
+    {
+        if ($saved !== null) {
+            $this->setting('ernestdefoe-member-map.distance_units', $saved);
+        }
+
+        $forum = json_decode((string) $this->send($this->request('GET', '/api'))->getBody(), true);
+
+        $this->assertSame($sent, $forum['data']['attributes']['memberMapDistanceUnits']);
+    }
 }

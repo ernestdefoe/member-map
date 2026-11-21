@@ -19,6 +19,21 @@ export default [
   new Extend.Admin()
     .setting(() => ({ setting: setting('nav'), type: 'boolean', label: t('settings.nav') }), 100)
     .setting(() => ({ setting: setting('profile'), type: 'boolean', label: t('settings.profile') }), 95)
+    .setting(
+      () => ({
+        setting: setting('distance_units'),
+        type: 'select',
+        // String keys, so the options stay in this order.
+        options: {
+          auto: String(t('settings.distance_units_auto')),
+          km: String(t('settings.distance_units_km')),
+          mi: String(t('settings.distance_units_mi')),
+        },
+        label: t('settings.distance_units'),
+        help: t('settings.distance_units_help'),
+      }),
+      92
+    )
     .setting(() => ({ setting: setting('jitter'), type: 'boolean', label: t('settings.jitter'), help: t('settings.jitter_help') }), 90)
     .setting(
       () => ({ setting: setting('allow_indexing'), type: 'boolean', label: t('settings.allow_indexing'), help: t('settings.allow_indexing_help') }),
