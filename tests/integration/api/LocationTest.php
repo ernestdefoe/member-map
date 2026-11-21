@@ -305,4 +305,21 @@ class LocationTest extends TestCase
         $this->assertSame(200, $second->getStatusCode());
         $this->assertSame('Nashville, Davidson County, Tennessee, United States', json_decode((string) $second->getBody(), true)['places'][0]['label']);
     }
+
+    #[Test]
+    public function a_lookup_queued_again_after_a_dropped_turn_counts_once()
+    {
+        $geocoder = $this->fake();
+        $geocoder->throttled = true;
+        $search = fn (string $q) => $this->send($this->request('GET', '/api/member-map/geocode', ['authenticatedAs' => 2])->withQueryParams(['q' => $q]));
+
+        // The first takes the second's turn: the second is dropped and re-queued on every ask.
+        $this->assertSame(200, $search('Nashville')->getStatusCode());
+        for ($ask = 0; $ask < 3; $ask++) {
+            $this->assertSame(429, $search('Memphis')->getStatusCode());
+        }
+
+        $cache = $this->app()->getContainer()->make(\Illuminate\Contracts\Cache\Repository::class);
+        $this->assertSame(2, (int) $cache->get('member-map:rate:m:2:'.intdiv(time(), 60)));
+    }
 }

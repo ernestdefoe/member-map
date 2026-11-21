@@ -279,7 +279,8 @@ class Geocoder
             throw new GeocoderUnavailable('Geocoder failed recently.');
         }
         if ($this->cache->add('member-map:geocoder:queued:'.$key, true, 15)) {
-            if ($for) {
+            // Once per member and place a minute: queued again after a dropped turn, it isn't counted again.
+            if ($for && $this->cache->add('member-map:geocoder:counted:'.$for->id.':'.$key, true, 60)) {
                 $this->limit->countLookup($for);
             }
             $this->queue->push(new LookUpPlace($key, $endpoint, $query));
