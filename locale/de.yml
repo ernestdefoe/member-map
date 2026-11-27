@@ -1,0 +1,187 @@
+ernestdefoe-member-map:
+  admin:
+    widget: Wo wir sind
+    permissions:
+      view: Mitgliederkarte ansehen
+      list: Auf der Mitgliederkarte erscheinen
+      travel: Reise-Pins auf der Mitgliederkarte setzen
+      meetup: Treffen auf der Mitgliederkarte planen
+    settings:
+      nav: Link zur Mitgliederkarte in der Seitenleiste des Forums anzeigen
+      profile: Mitgliedern erlauben, ihren Ort im Profil und auf der Nutzerkarte zu zeigen
+      distance_units: Entfernungen anzeigen in
+      distance_units_help: "Wird für die groben Entfernungen unter „In deiner Nähe“ verwendet. „Automatisch“ richtet sich nach dem Browser des Mitglieds: Meilen in den USA, im Vereinigten Königreich, in Liberia und Myanmar, sonst Kilometer. Ein Browser mit amerikanischem Englisch schätzt überall auf Meilen. Wähle daher eine Einheit, wenn deine Community eine bestimmte nutzt."
+      distance_units_auto: Automatisch (nach dem Browser des Mitglieds)
+      distance_units_km: Kilometer
+      distance_units_mi: Meilen
+      jitter: Mitglieder innerhalb ihrer Stadt leicht streuen
+      jitter_help: "Mitglieder, die „Stadt“ gewählt haben, werden um bis zu etwa 3 km vom Stadtzentrum versetzt, und zwar immer gleich. So stapeln sich in einer großen Stadt nicht alle auf einem Punkt."
+      trip_radius_km: Mitglieder im Umkreis von so vielen Kilometern über eine Reise informieren
+      trip_radius_km_help: "Mitglieder, die so nah an einem Reiseziel wohnen, bekommen die Benachrichtigung „Besuch in deiner Nähe“. Standard 160 km (etwa 100 Meilen); 10 bis 1.000."
+      trip_max_alerts: Höchstzahl der Mitglieder, die über eine Reise informiert werden
+      trip_max_alerts_help: "Zuerst die am nächsten wohnenden Mitglieder. Standard 50; 1 bis 200."
+      allow_indexing: Suchmaschinen erlauben, die Kartenseite zu indexieren
+      allow_indexing_help: "Standardmäßig aus: Die Seite bittet Suchmaschinen, sie nicht zu indexieren. Daten von Mitgliedern gehen in keinem Fall an Suchmaschinen."
+      meetup_tag: Tag für Treffen-Diskussionen
+      meetup_tag_none: Tag wählen
+      meetup_tag_help: Jedes Treffen legt eine Diskussion an. Bei aktivierten Tags brauchen Mitglieder die Berechtigung für dieses Tag, um ein Treffen zu planen.
+      style_url: Adresse des Kartenstils
+      style_url_help: "Ein MapLibre-Vektorstil. Leer lassen, um stattdessen die Kachel-Adresse weiter unten zu verwenden. Der Standard OpenFreeMap ist kostenlos und braucht keinen Schlüssel."
+      style_dark_url: Adresse des Kartenstils im dunklen Modus
+      style_dark_url_help: Optional. Wird verwendet, wenn das Forum dunkel ist. Leer lassen, um den Stil von oben zu verwenden.
+      tiles_url: Adresse der Kartenkacheln
+      tiles_url_help: "Bildkacheln, wenn der Stil oben leer ist oder nicht geladen werden kann, und für die kleine Karte im Profil. Leer lassen für OpenStreetMap, das keinen Schlüssel braucht."
+      attribution: Quellenangabe der Karte
+      attribution_help: "Die Quellenangabe, die bei den Bildkacheln angezeigt wird. Die meisten Kartenanbieter verlangen sie. Einfache HTML-Links sind erlaubt."
+      geocoder_url: Adresse der Ortssuche
+      geocoder_url_help: "Leer lassen für den kostenlosen Nominatim-Dienst von OpenStreetMap. Jeder Dienst mit derselben API funktioniert, etwa ein eigener Nominatim-Server oder LocationIQ. Die Suche läuft auf deinem Server, höchstens einmal pro Sekunde, und jede Antwort wird 30 Tage gespeichert."
+      geocoder_key: API-Schlüssel der Ortssuche
+      geocoder_key_help: Optional. Nur für Dienste, die einen Schlüssel verlangen. Er wird nie an Browser gesendet.
+      geocoder_email: Kontakt-E-Mail für die Ortssuche
+      geocoder_email_help: "Optional. Nominatim bittet stark genutzte Seiten um eine Adresse, an die es sich bei Problemen wenden kann."
+
+  forum:
+    nav: Mitgliederkarte
+    page:
+      title: Mitgliederkarte
+      intro: "Mitglieder, die sich ungefähr verorten möchten. Niemand steht auf der Karte, der sich nicht selbst eingetragen hat."
+      map_label: Karte der Mitglieder
+      guest: Melde dich an, um die Mitgliederkarte zu sehen.
+      no_permission: Du hast keine Berechtigung, die Mitgliederkarte zu sehen.
+      add_me: Mich auf der Karte eintragen
+      change: Meinen Ort ändern
+      remove: Mich von der Karte entfernen
+      you_are: "Du wirst bei {label} angezeigt."
+      not_listed: "Dein Ort ist gespeichert, aber du kannst im Moment nicht auf der Karte erscheinen."
+      empty: Noch hat sich niemand auf der Karte eingetragen.
+      load_error: "Die Karte konnte nicht geladen werden. Versuche es in einer Minute noch einmal."
+      map_failed: "Die Karte konnte in diesem Browser nicht gestartet werden, daher siehst du stattdessen die Liste. Vielleicht hilft ein Neuladen der Seite."
+      zoom_in: Hier hineinzoomen
+      more: "und {count} weitere"
+      members: "{count, plural, one {# Mitglied} other {# Mitglieder}}"
+    pin:
+      member: "{name}, {place}"
+      cluster: "{count} Mitglieder hier. Anzeigen, wer."
+      trip: "{name} besucht {place}, {dates}"
+      meetup: "Treffen: {title}, {when}"
+    card:
+      label: Details
+      close: Schließen
+      online: Gerade online
+      local_time: "{time} Uhr dort"
+      profile: Profil ansehen
+    stats:
+      members: "{count, plural, one {# Mitglied} other {# Mitglieder}}"
+      countries: "{count, plural, one {# Land} other {# Länder}}"
+      to_go: "{count, plural, one {# Kontinent fehlt noch} other {# Kontinente fehlen noch}}"
+      everywhere: auf allen bewohnten Kontinenten
+      online: "{count} gerade online"
+    search:
+      label: Auf der Karte nach einem Ort suchen
+      placeholder: Ort suchen
+      button: Suchen
+      none: Keine Orte gefunden.
+    filters:
+      label: Anzeigen
+      online: Gerade online
+      following: Leute, denen ich folge
+      group: Gruppe
+      any_group: Alle
+      travelers: Reisende
+      meetups: Treffen
+    view:
+      label: Ansicht
+      map: Karte
+      list: Liste
+    list:
+      elsewhere: Irgendwo
+    near:
+      heading: In deiner Nähe
+      add_prompt: Trage dich auf der Karte ein, um zu sehen, wer in deiner Nähe wohnt.
+      none: Noch niemand sonst steht auf der Karte.
+      same_area: In deiner Gegend
+      km: "etwa {count} km"
+      mi: "etwa {count} mi"
+      show: "{name} auf der Karte zeigen"
+    trip:
+      button: Ich bin unterwegs
+      title: Ich bin unterwegs
+      help: "Setze einen Reise-Pin, damit Mitglieder in der Nähe wissen, dass du kommst. Er verschwindet nach dem letzten Tag von selbst."
+      where: Wohin geht die Reise?
+      from: Von
+      to: Bis
+      save: Reise-Pin setzen
+      saved: Dein Reise-Pin steht auf der Karte. Mitglieder, die in der Nähe wohnen, werden darüber informiert.
+      mine: Deine Reisen
+      visiting: "Besuch in {place}, {dates}"
+      remove: Entfernen
+    meetup:
+      button: Treffen planen
+      title: Treffen planen
+      name: Was ist geplant?
+      name_placeholder: "Zum Beispiel: Kaffee in Hamburg"
+      where: Wo?
+      when: Wann?
+      when_help: In der Ortszeit des Ortes.
+      details: Einzelheiten
+      details_placeholder: Wo genau, was mitzubringen ist, woran man dich erkennt …
+      save: Planen
+      saved: Dein Treffen steht auf der Karte, samt einer Diskussion zum Absprechen.
+      heading: Kommende Treffen
+      open: Diskussion öffnen
+    location:
+      title: Dein Ort auf der Karte
+      search_label: Suche nach deiner Stadt, Region oder deinem Land
+      search_placeholder: "Zum Beispiel: Hamburg"
+      search: Suchen
+      no_results: "Keine Orte gefunden. Versuche eine andere Schreibweise oder setze einen Pin auf die Karte."
+      or_pin: Oder setze einen Pin auf die Karte
+      pin_help: Tippe oder klicke auf die Karte, wo du bist. Gespeichert wird nur der Ort rund um die Stelle, nie der Pin selbst.
+      pin_failed: "Die Karte konnte in diesem Browser nicht gestartet werden. Suche stattdessen nach deinem Ort."
+      precision_label: Wie genau soll man dich sehen?
+      precision:
+        city: Stadt
+        region: Region oder Bundesland
+        country: Nur das Land
+      preview: "Du wirst so angezeigt: {label}"
+      preview_loading: Ort wird gesucht …
+      who_label: Wer darf es sehen?
+      profile: In meinem Profil und auf meiner Nutzerkarte anzeigen
+      members_only: Nur angemeldete Mitglieder (vor Gästen und Suchmaschinen verbergen)
+      save: Speichern
+      saved: Dein Ort auf der Karte ist gespeichert.
+      removed: Du wurdest von der Karte entfernt.
+      pick_first: Suche zuerst einen Ort oder setze einen Pin.
+      finer: Um genauer angezeigt zu werden, suche nach deinem Ort oder setze einen Pin.
+    errors:
+      member_map_bad_query: Gib zum Suchen mindestens zwei Buchstaben ein.
+      member_map_bad_point: Dieser Ort konnte nicht gelesen werden. Versuche es noch einmal.
+      member_map_no_place: "Dort gibt es keine Stadt und kein Land. Versuche eine Stelle an Land oder suche stattdessen."
+      member_map_slow_down: "Zu viele Suchanfragen auf einmal. Warte eine Minute und versuche es dann noch einmal."
+      member_map_unavailable: "Die Ortssuche antwortet gerade nicht. Versuche es in einer Minute noch einmal."
+      member_map_busy: "Der Ort wird noch gesucht. Versuche es in ein paar Sekunden noch einmal."
+      member_map_bad_trip: "Prüfe die Daten: Eine Reise darf nicht enden, bevor sie beginnt, nicht in der Vergangenheit liegen und nicht länger als 60 Tage dauern."
+      member_map_too_many_trips: Du hast bereits 5 anstehende Reisen. Entferne zuerst eine.
+      member_map_bad_meetup: "Prüfe das Treffen: Es braucht einen Namen (3 bis 80 Zeichen) und einen Zeitpunkt im kommenden Jahr."
+      member_map_meetup_tag_denied: "Du darfst im Tag für Treffen keine Diskussionen beginnen und kannst hier daher kein Treffen planen."
+      member_map_meetup_needs_tag: "Treffen können noch nicht geplant werden: Ein Administrator muss in den Einstellungen der Mitgliederkarte ein Tag dafür wählen."
+    notification:
+      trip: "{username} besucht deine Gegend"
+      preference: Jemand besucht meine Gegend
+    settings:
+      heading: Mitgliederkarte
+      none: "Du stehst nicht auf der Mitgliederkarte."
+      shown_as: "Du wirst als {label} angezeigt."
+      members_only: Nur angemeldete Mitglieder können dich sehen.
+    profile:
+      mini_label: "Wohnt in {place}. Auf der Mitgliederkarte zeigen."
+    widget:
+      title: Wo wir sind
+      line: "{members, plural, one {# Mitglied} other {# Mitglieder}} in {countries, plural, one {# Land} other {# Ländern}}"
+      open: Mitgliederkarte öffnen
+
+  lib:
+    meetup_on_map: Auf der Mitgliederkarte ansehen
+    gdpr:
+      export: Dein Ort und deine Reise-Pins auf der Mitgliederkarte.
+      delete: Entfernt deinen Ort und deine Reise-Pins von der Mitgliederkarte.
